@@ -1,5 +1,12 @@
 package com.example.proyectofoe
 
+import com.example.proyectofoe.ui.screens.CLIENTES_S.crearClientesPorDefecto
+import com.example.proyectofoe.ui.screens.CLIENTES_S.crearProductosPorDefecto
+import com.example.proyectofoe.ui.screens.CLIENTES_S.formatearLempiras
+import com.example.proyectofoe.ui.screens.CLIENTES_S.obtenerIniciales
+import com.example.proyectofoe.ui.screens.CLIENTES_S.parsearSugeridos
+import com.example.proyectofoe.ui.screens.CLIENTES_S.validarPaso1NuevoCliente
+import com.example.proyectofoe.ui.screens.CLIENTES_S.validarPaso2NuevoCliente
 import com.example.proyectofoe.ui.screens.LOGIN_S.CONTRASENA_DEMO
 import com.example.proyectofoe.ui.screens.LOGIN_S.USUARIO_DEMO
 import com.example.proyectofoe.ui.screens.LOGIN_S.construirMensajeIntentoFallido
@@ -59,5 +66,43 @@ class ExampleUnitTest {
             "Demasiados intentos. Espera 15:00 o pide a tu supervisor que te desbloquee.",
             construirMensajeIntentoFallido(5)
         )
+    }
+
+    @Test
+    fun clientesPorDefecto_contieneLas12ParadasDelDemo() {
+        val clientes = crearClientesPorDefecto()
+        assertEquals(12, clientes.size)
+        val parada5 = clientes.first { it.parada == 5 }
+        assertEquals("Abarrotes Mi Esperanza", parada5.nombreNegocio)
+        assertEquals("Rosa Mejía", parada5.dueno)
+        assertEquals(412000, parada5.saldoCentavos)
+        assertEquals("L 4,120.00", formatearLempiras(parada5.saldoCentavos))
+    }
+
+    @Test
+    fun productosPorDefecto_contieneLos14ProductosDelDemo() {
+        val productos = crearProductosPorDefecto()
+        assertEquals(14, productos.size)
+        val arroz = productos.first { it.id == 1 }
+        assertEquals("Arroz precocido 5 lb", arroz.nombre)
+        assertEquals(0, arroz.isvPorcentaje)
+        val harina = productos.first { it.id == 4 }
+        assertEquals(0, harina.stockCamion)
+    }
+
+    @Test
+    fun clientes_parseaSugeridosYValidaNuevoCliente() {
+        val sugeridos = parsearSugeridos("1:2,7:2,5:1,2:1")
+        assertEquals(4, sugeridos.size)
+        assertEquals(2, sugeridos[1])
+        assertEquals(1, sugeridos[5])
+
+        assertEquals("RM", obtenerIniciales("Rosa Mejía"))
+        assertTrue(validarPaso1NuevoCliente("Pulpería La Esperanza", "Rosa Mejía", "9999-9999"))
+        assertFalse(validarPaso1NuevoCliente("AB", "Rosa Mejía", "9999-9999"))
+        assertFalse(validarPaso1NuevoCliente("Pulpería La Esperanza", "Rosa Mejía", "1234"))
+
+        assertTrue(validarPaso2NuevoCliente(true, true, "Bo. El Centro, Talanga"))
+        assertFalse(validarPaso2NuevoCliente(false, true, "Bo. El Centro, Talanga"))
     }
 }
