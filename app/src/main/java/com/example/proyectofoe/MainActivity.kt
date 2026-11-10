@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.room.Room
 import com.example.proyectofoe.local.FoeDatabase
-import com.example.proyectofoe.local.MIGRATION_2_3
 import com.example.proyectofoe.local.UsuarioEntity
 import com.example.proyectofoe.ui.screens.CLIENTES_S.ClientesScreen
 import com.example.proyectofoe.ui.screens.HOME_S.HomeScreen
@@ -31,8 +30,7 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             FoeDatabase::class.java,
             "foe360_db"
-        ).addMigrations(MIGRATION_2_3)
-            .fallbackToDestructiveMigration(true)
+        ).fallbackToDestructiveMigration(true)
             .build()
 
         setContent {
