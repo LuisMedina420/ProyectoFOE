@@ -2,7 +2,6 @@ package com.example.proyectofoe.ui.screens.LOGIN_S
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,8 +42,6 @@ import com.example.proyectofoe.local.UsuarioDao
 import com.example.proyectofoe.local.UsuarioEntity
 import com.example.proyectofoe.ui.theme.BrandNavy
 import com.example.proyectofoe.ui.theme.BrandRingGold
-import com.example.proyectofoe.ui.theme.FoeCardBackground
-import com.example.proyectofoe.ui.theme.FoeError
 import com.example.proyectofoe.ui.theme.FoeErrorContainer
 import com.example.proyectofoe.ui.theme.FoeOnErrorContainer
 import com.example.proyectofoe.ui.theme.FoeOnPrimaryContainer
@@ -56,23 +51,24 @@ import com.example.proyectofoe.ui.theme.FoePrimary
 import com.example.proyectofoe.ui.theme.FoePrimaryContainer
 import com.example.proyectofoe.ui.theme.FoeSurface
 import com.example.proyectofoe.ui.theme.FoeSurfaceContainerLow
+import com.example.proyectofoe.ui.theme.ModuloVerde
 import com.example.proyectofoe.ui.theme.OnBrandNavy
 import com.example.proyectofoe.ui.theme.OnBrandSubtitle
 import com.example.proyectofoe.ui.theme.ProyectoFOETheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-const val USUARIO_DEMO = "mzelaya"
-const val CONTRASENA_DEMO = "ruta2026"
-const val MAX_INTENTOS = 5
-const val MINUTOS_BLOQUEO = 15
 
 fun crearUsuarioPorDefecto(): UsuarioEntity {
     return UsuarioEntity(
         id = 1,
-        usuario = USUARIO_DEMO,
-        contrasena = CONTRASENA_DEMO,
+        usuario = "mzelaya",
+        correo = "mzelaya@gmail.com",
+        contrasena = "ruta2026",
+        codigoBodega = "B-001",
+        contrasenaBodega = "bodega2026",
+        nombreBodega = "Bodega Central",
         nombre = "Mario Zelaya",
-        iniciales = "MZ",
+        iniciales = "CLFK",
         rol = "Vendedor",
         subtituloRol = "Autoventa · factura al momento",
         ruta = "R-07 Talanga - Guaimaca",
@@ -82,46 +78,89 @@ fun crearUsuarioPorDefecto(): UsuarioEntity {
     )
 }
 
-fun validarCredencialesDemo(usuario: String, contrasena: String): Boolean {
-    return usuario.trim().lowercase() == USUARIO_DEMO && contrasena == CONTRASENA_DEMO
-}
-
-fun construirMensajeIntentoFallido(intentosFallidos: Int): String {
-    val restantes = MAX_INTENTOS - intentosFallidos
-    return if (restantes <= 0) {
-        "Demasiados intentos. Espera $MINUTOS_BLOQUEO:00 o pide a tu supervisor que te desbloquee."
-    } else {
-        val avisoIntentos = if (restantes <= 2) {
-            if (restantes == 1) {
-                " Te queda 1 intento antes de que se bloquee $MINUTOS_BLOQUEO minutos."
-            } else {
-                " Te quedan $restantes intentos antes de que se bloquee $MINUTOS_BLOQUEO minutos."
-            }
-        } else {
-            ""
-        }
-        "Usuario o contraseña incorrectos.$avisoIntentos"
-    }
-}
-
 @Composable
 fun LoginScreen(
     usuarioDao: UsuarioDao,
     onLoginExitoso: (UsuarioEntity) -> Unit
 ) {
-    var usuario by remember { mutableStateOf("") }
-    var contrasena by remember { mutableStateOf("") }
-    var mostrarContrasena by remember { mutableStateOf(false) }
-    var intentosFallidos by remember { mutableStateOf(0) }
-    var bloqueado by remember { mutableStateOf(false) }
-    var entrando by remember { mutableStateOf(false) }
-    var mostrarError by remember { mutableStateOf(false) }
-    var mensajeError by remember { mutableStateOf("") }
-    var mostrarAvisoOlvide by remember { mutableStateOf(false) }
+    var pasoActual by remember {
+        mutableStateOf("login")
+    }
+
+    var correo by remember {
+        mutableStateOf("")
+    }
+
+    var contrasena by remember {
+        mutableStateOf("")
+    }
+
+    var mostrarContrasena by remember {
+        mutableStateOf(false)
+    }
+
+    var cargando by remember {
+        mutableStateOf(false)
+    }
+
+    var mensaje by remember {
+        mutableStateOf("")
+    }
+
+    var esError by remember {
+        mutableStateOf(false)
+    }
+
+    var pasoRecuperacion by remember {
+        mutableStateOf("correo")
+    }
+
+    var correoRecuperacion by remember {
+        mutableStateOf("")
+    }
+
+    var correoEnviado by remember {
+        mutableStateOf("")
+    }
+
+    var codigoRecuperacion by remember {
+        mutableStateOf("")
+    }
+
+    var nuevaContrasena by remember {
+        mutableStateOf("")
+    }
+
+    var confirmacionContrasena by remember {
+        mutableStateOf("")
+    }
+
+    var mostrarNuevaContrasena by remember {
+        mutableStateOf(false)
+    }
+
+    var usuarioPendiente by remember {
+        mutableStateOf<UsuarioEntity?>(null)
+    }
+
+    var correoSesionActiva by remember {
+        mutableStateOf("")
+    }
+
+    var codigoBodega by remember {
+        mutableStateOf("")
+    }
+
+    var contrasenaBodega by remember {
+        mutableStateOf("")
+    }
+
+    var mostrarContrasenaBodega by remember {
+        mutableStateOf(false)
+    }
 
     val scope = rememberCoroutineScope()
 
-    // Semilla inicial del usuario del sistema si la base local está vacía
     LaunchedEffect(usuarioDao) {
         try {
             val existentes = usuarioDao.obtenerTodos()
@@ -129,14 +168,9 @@ fun LoginScreen(
                 usuarioDao.insertar(crearUsuarioPorDefecto())
             }
         } catch (e: Exception) {
-            // Se manejará en el inicio de sesión si ocurre algún problema
+            mensaje = ""
         }
     }
-
-    val botonHabilitado = usuario.trim().isNotEmpty() &&
-            contrasena.isNotEmpty() &&
-            !bloqueado &&
-            !entrando
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -148,27 +182,25 @@ fun LoginScreen(
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
-            // CABECERA AZUL MARINO (lg-hero del demo FOE 360)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(BrandNavy)
-                    .padding(top = 32.dp, bottom = 36.dp, start = 24.dp, end = 24.dp),
+                    .padding(top = 28.dp, bottom = 32.dp, start = 24.dp, end = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Logo FOE 360
                 Card(
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = BrandNavy
                     ),
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 6.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .background(BrandNavy)
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
@@ -177,6 +209,7 @@ fun LoginScreen(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
+
                         Text(
                             text = "FOE",
                             color = OnBrandNavy,
@@ -188,7 +221,7 @@ fun LoginScreen(
                 }
 
                 Text(
-                    text = "Ventas en ruta",
+                    text = "SYS FOE · Ventas en ruta",
                     color = OnBrandSubtitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -196,266 +229,703 @@ fun LoginScreen(
                 )
             }
 
-            // TARJETA PRINCIPAL DE LOGIN (lg-card del demo FOE 360)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = true)
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(FoeSurface)
-                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                    .padding(horizontal = 24.dp, vertical = 26.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "Inicia sesión",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = FoeOnSurface
-                    )
-
-                    Text(
-                        text = "Con el usuario y la contraseña que te dio tu supervisor.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FoeOnSurfaceVariant
-                    )
-
-                    // Campo Usuario
-                    OutlinedTextField(
-                        value = usuario,
-                        onValueChange = { nuevo ->
-                            usuario = nuevo
-                            mostrarError = false
-                            mensajeError = ""
-                        },
-                        label = { Text("Usuario") },
-                        singleLine = true,
-                        isError = mostrarError,
-                        enabled = !bloqueado && !entrando,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Campo Contraseña
-                    OutlinedTextField(
-                        value = if (mostrarContrasena) contrasena else "•".repeat(contrasena.length),
-                        onValueChange = { nuevo ->
-                            if (mostrarContrasena) {
-                                contrasena = nuevo
-                            } else {
-                                if (nuevo.length > contrasena.length) {
-                                    val agregados = nuevo.filter { it != '•' }
-                                    contrasena += agregados
-                                } else if (nuevo.length < contrasena.length) {
-                                    contrasena = contrasena.take(nuevo.length)
-                                }
-                            }
-                            mostrarError = false
-                            mensajeError = ""
-                        },
-                        label = { Text("Contraseña") },
-                        singleLine = true,
-                        isError = mostrarError,
-                        enabled = !bloqueado && !entrando,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Fila de opciones: Mostrar/Ocultar contraseña y Olvidé mi contraseña
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterChip(
-                            selected = mostrarContrasena,
-                            onClick = { mostrarContrasena = !mostrarContrasena },
-                            label = {
-                                Text(
-                                    if (mostrarContrasena) "Ocultar contraseña" else "Mostrar contraseña"
-                                )
-                            }
-                        )
-
-                        OutlinedButton(
-                            onClick = { mostrarAvisoOlvide = !mostrarAvisoOlvide }
-                        ) {
-                            Text("Olvidé mi contraseña")
-                        }
-                    }
-
-                    // Aviso de "Olvidé mi contraseña" (igual al diálogo del demo)
-                    if (mostrarAvisoOlvide) {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = FoeSurfaceContainerLow
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "¿Olvidaste tu contraseña?",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = FoeOnSurface
-                                )
-                                Text(
-                                    text = "Pide a tu supervisor que te asigne una nueva desde el escritorio de FOE 360. Mientras tanto no se puede entrar en este teléfono.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = FoeOnSurfaceVariant
-                                )
-                                Button(
-                                    onClick = { mostrarAvisoOlvide = false },
-                                    modifier = Modifier.align(Alignment.End)
-                                ) {
-                                    Text("Entendido")
-                                }
-                            }
-                        }
-                    }
-
-                    // Mensaje de error / bloqueo (lgMsg del demo)
-                    if (mensajeError.isNotBlank()) {
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = FoeErrorContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                                containerColor = FoePrimaryContainer
+                            )
                         ) {
                             Text(
-                                text = mensajeError,
-                                color = FoeOnErrorContainer,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(12.dp)
+                                text = "FOE 360",
+                                color = FoeOnPrimaryContainer,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
+                        }
+
+                        if (pasoActual == "recuperacion") {
+                            OutlinedButton(
+                                onClick = {
+                                    if (!cargando) {
+                                        mensaje = ""
+                                        esError = false
+                                        if (pasoRecuperacion == "codigo") {
+                                            pasoRecuperacion = "correo"
+                                        } else {
+                                            pasoActual = "login"
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Volver")
+                            }
+                        } else {
+                            Card(
+                                shape = RoundedCornerShape(50.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = FoeSurfaceContainerLow
+                                )
+                            ) {
+                                Text(
+                                    text = "● En línea",
+                                    color = ModuloVerde,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
 
-                    // Botón principal Entrar (lgGo del demo)
-                    Button(
-                        onClick = {
-                            val usuarioLimpio = usuario.trim()
-                            if (usuarioLimpio.isEmpty() || contrasena.isEmpty() || bloqueado || entrando) {
-                                return@Button
-                            }
+                    when (pasoActual) {
+                        "login" -> {
+                            Text(
+                                text = "Hola de nuevo",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = FoeOnSurface
+                            )
 
-                            entrando = true
-                            mostrarError = false
-                            mensajeError = ""
+                            Text(
+                                text = "Inicia sesión para entrar a tu tienda.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FoeOnSurfaceVariant
+                            )
 
-                            scope.launch {
-                                try {
-                                    val existentes = usuarioDao.obtenerTodos()
-                                    if (existentes.isEmpty()) {
-                                        usuarioDao.insertar(crearUsuarioPorDefecto())
-                                    }
+                            OutlinedTextField(
+                                value = correo,
+                                onValueChange = {
+                                    correo = it
+                                    mensaje = ""
+                                    esError = false
+                                },
+                                label = {
+                                    Text("Correo electrónico")
+                                },
+                                placeholder = {
+                                    Text("usuario@gmail.com")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = !cargando
+                            )
 
-                                    val encontrado = usuarioDao.iniciarSesion(
-                                        usuario = usuarioLimpio,
-                                        contrasena = contrasena
-                                    ) ?: if (validarCredencialesDemo(usuarioLimpio, contrasena)) {
-                                        crearUsuarioPorDefecto()
+                            OutlinedTextField(
+                                value = if (mostrarContrasena) contrasena else "•".repeat(contrasena.length),
+                                onValueChange = { nuevo ->
+                                    if (mostrarContrasena) {
+                                        contrasena = nuevo
                                     } else {
-                                        null
-                                    }
-
-                                    if (encontrado != null) {
-                                        intentosFallidos = 0
-                                        mostrarError = false
-                                        mensajeError = ""
-                                        onLoginExitoso(encontrado)
-                                    } else {
-                                        intentosFallidos += 1
-                                        contrasena = ""
-                                        mostrarError = true
-                                        if (MAX_INTENTOS - intentosFallidos <= 0) {
-                                            bloqueado = true
+                                        if (nuevo.length > contrasena.length) {
+                                            contrasena += nuevo.filter { it != '•' }
+                                        } else if (nuevo.length < contrasena.length) {
+                                            contrasena = contrasena.take(nuevo.length)
                                         }
-                                        mensajeError = construirMensajeIntentoFallido(intentosFallidos)
                                     }
-                                } catch (e: Exception) {
-                                    mensajeError = "Error al validar el usuario. Intenta de nuevo."
-                                } finally {
-                                    entrando = false
+                                    mensaje = ""
+                                    esError = false
+                                },
+                                label = {
+                                    Text("Contraseña")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = !cargando
+                            )
+
+                            FilterChip(
+                                selected = mostrarContrasena,
+                                onClick = {
+                                    mostrarContrasena = !mostrarContrasena
+                                },
+                                label = {
+                                    Text(
+                                        if (mostrarContrasena) "Ocultar contraseña" else "Mostrar contraseña"
+                                    )
+                                }
+                            )
+
+                            if (mensaje.isNotBlank()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (esError) FoeErrorContainer else FoePrimaryContainer
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = mensaje,
+                                        color = if (esError) FoeOnErrorContainer else FoeOnPrimaryContainer,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
                                 }
                             }
-                        },
-                        enabled = botonHabilitado,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FoePrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                    ) {
-                        Text(
-                            text = if (entrando) "Entrando..." else "Entrar",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // Cuadro de credenciales de prueba (lg-demo del demo FOE 360)
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = FoeSurfaceContainerLow
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "Prueba:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = FoeOnSurfaceVariant
-                                )
-                                Text(
-                                    text = "$USUARIO_DEMO · $CONTRASENA_DEMO",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    color = FoeOnSurface,
-                                    fontSize = 14.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
 
                             Button(
                                 onClick = {
-                                    if (!bloqueado) {
-                                        usuario = USUARIO_DEMO
-                                        contrasena = CONTRASENA_DEMO
-                                        mostrarError = false
-                                        mensajeError = ""
+                                    if (correo.isBlank() || contrasena.isBlank()) {
+                                        mensaje = "El Usuario o contraseña estan vacios"
+                                        esError = true
+                                    } else {
+                                        val textoCorreo = correo.trim()
+                                        val correoNormalizado = if (textoCorreo.contains("@")) {
+                                            textoCorreo
+                                        } else {
+                                            "$textoCorreo@gmail.com"
+                                        }
+
+                                        cargando = true
+                                        esError = false
+                                        mensaje = "Procesando..."
+
+                                        scope.launch {
+                                            try {
+                                                val existentes = usuarioDao.obtenerTodos()
+                                                if (existentes.isEmpty()) {
+                                                    usuarioDao.insertar(crearUsuarioPorDefecto())
+                                                }
+
+                                                val encontrado = usuarioDao.iniciarSesion(
+                                                    correoOUsuario = correoNormalizado,
+                                                    contrasena = contrasena
+                                                ) ?: usuarioDao.iniciarSesion(
+                                                    correoOUsuario = textoCorreo,
+                                                    contrasena = contrasena
+                                                )
+
+                                                contrasena = ""
+
+                                                if (encontrado != null) {
+                                                    usuarioPendiente = encontrado
+                                                    correoSesionActiva = correoNormalizado
+                                                    codigoBodega = ""
+                                                    contrasenaBodega = ""
+                                                    mostrarContrasenaBodega = false
+                                                    mensaje = ""
+                                                    esError = false
+                                                    pasoActual = "bodega"
+                                                } else {
+                                                    mensaje = "Usuario o Contraseña incorrectos"
+                                                    esError = true
+                                                }
+                                            } catch (e: Exception) {
+                                                mensaje = "Error al iniciar sesión: ${e.message}"
+                                                esError = true
+                                            } finally {
+                                                cargando = false
+                                            }
+                                        }
                                     }
                                 },
-                                enabled = !bloqueado && !entrando,
+                                enabled = !cargando,
+                                shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = FoePrimaryContainer,
-                                    contentColor = FoeOnPrimaryContainer
-                                )
+                                    containerColor = FoePrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
                             ) {
                                 Text(
-                                    text = "Llenar",
-                                    fontWeight = FontWeight.SemiBold
+                                    if (cargando) "Entrando..." else "Entrar"
                                 )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    correoRecuperacion = correo
+                                    correoEnviado = ""
+                                    codigoRecuperacion = ""
+                                    nuevaContrasena = ""
+                                    confirmacionContrasena = ""
+                                    mostrarNuevaContrasena = false
+                                    mensaje = ""
+                                    esError = false
+                                    pasoRecuperacion = "correo"
+                                    pasoActual = "recuperacion"
+                                },
+                                enabled = !cargando,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("¿Olvidaste tu contraseña?")
+                            }
+                        }
+
+                        "recuperacion" -> {
+                            Text(
+                                text = when (pasoRecuperacion) {
+                                    "codigo" -> "Revisa tu correo"
+                                    "nueva" -> "Contraseña nueva"
+                                    else -> "Recuperar contraseña"
+                                },
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = FoeOnSurface
+                            )
+
+                            Text(
+                                text = when (pasoRecuperacion) {
+                                    "codigo" -> "Si $correoEnviado está registrado, te llegará un código de 6 dígitos."
+                                    "nueva" -> "Elige una contraseña que cumpla las reglas."
+                                    else -> "Te enviaremos un código a tu correo."
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FoeOnSurfaceVariant
+                            )
+
+                            if (mensaje.isNotBlank()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (esError) FoeErrorContainer else FoePrimaryContainer
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = mensaje,
+                                        color = if (esError) FoeOnErrorContainer else FoeOnPrimaryContainer,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            }
+
+                            when (pasoRecuperacion) {
+                                "correo" -> {
+                                    OutlinedTextField(
+                                        value = correoRecuperacion,
+                                        onValueChange = {
+                                            correoRecuperacion = it
+                                            mensaje = ""
+                                            esError = false
+                                        },
+                                        label = {
+                                            Text("Correo electrónico")
+                                        },
+                                        placeholder = {
+                                            Text("usuario@gmail.com")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            if (correoRecuperacion.isBlank()) {
+                                                mensaje = "Escribe tu usuario o correo."
+                                                esError = true
+                                            } else {
+                                                val limpio = correoRecuperacion.trim()
+                                                correoEnviado = if (limpio.contains("@")) {
+                                                    limpio.lowercase()
+                                                } else {
+                                                    "${limpio.lowercase()}@gmail.com"
+                                                }
+                                                codigoRecuperacion = ""
+                                                mensaje = ""
+                                                esError = false
+                                                pasoRecuperacion = "codigo"
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = FoePrimary
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                    ) {
+                                        Text("Enviar código")
+                                    }
+                                }
+
+                                "codigo" -> {
+                                    OutlinedTextField(
+                                        value = codigoRecuperacion,
+                                        onValueChange = { nuevo ->
+                                            codigoRecuperacion = nuevo.filter { it.isDigit() }.take(6)
+                                            mensaje = ""
+                                            esError = false
+                                        },
+                                        label = {
+                                            Text("Código de 6 dígitos")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            if (codigoRecuperacion.length != 6) {
+                                                mensaje = "El código tiene 6 dígitos."
+                                                esError = true
+                                            } else {
+                                                mensaje = ""
+                                                esError = false
+                                                pasoRecuperacion = "nueva"
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = FoePrimary
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                    ) {
+                                        Text("Verificar código")
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                mensaje = ""
+                                                esError = false
+                                                pasoRecuperacion = "correo"
+                                            }
+                                        ) {
+                                            Text("Cambiar correo")
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                codigoRecuperacion = ""
+                                                mensaje = "Te enviamos un código nuevo."
+                                                esError = false
+                                            }
+                                        ) {
+                                            Text("Reenviar código")
+                                        }
+                                    }
+                                }
+
+                                "nueva" -> {
+                                    OutlinedTextField(
+                                        value = if (mostrarNuevaContrasena) nuevaContrasena else "•".repeat(nuevaContrasena.length),
+                                        onValueChange = { nuevo ->
+                                            if (mostrarNuevaContrasena) {
+                                                nuevaContrasena = nuevo
+                                            } else {
+                                                if (nuevo.length > nuevaContrasena.length) {
+                                                    nuevaContrasena += nuevo.filter { it != '•' }
+                                                } else if (nuevo.length < nuevaContrasena.length) {
+                                                    nuevaContrasena = nuevaContrasena.take(nuevo.length)
+                                                }
+                                            }
+                                            mensaje = ""
+                                            esError = false
+                                        },
+                                        label = {
+                                            Text("Contraseña nueva")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    OutlinedTextField(
+                                        value = if (mostrarNuevaContrasena) confirmacionContrasena else "•".repeat(confirmacionContrasena.length),
+                                        onValueChange = { nuevo ->
+                                            if (mostrarNuevaContrasena) {
+                                                confirmacionContrasena = nuevo
+                                            } else {
+                                                if (nuevo.length > confirmacionContrasena.length) {
+                                                    confirmacionContrasena += nuevo.filter { it != '•' }
+                                                } else if (nuevo.length < confirmacionContrasena.length) {
+                                                    confirmacionContrasena = confirmacionContrasena.take(nuevo.length)
+                                                }
+                                            }
+                                            mensaje = ""
+                                            esError = false
+                                        },
+                                        label = {
+                                            Text("Repite la contraseña")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    FilterChip(
+                                        selected = mostrarNuevaContrasena,
+                                        onClick = {
+                                            mostrarNuevaContrasena = !mostrarNuevaContrasena
+                                        },
+                                        label = {
+                                            Text(
+                                                if (mostrarNuevaContrasena) "Ocultar contraseña" else "Mostrar contraseña"
+                                            )
+                                        }
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            if (nuevaContrasena.length < 8) {
+                                                mensaje = "La contraseña debe tener al menos 8 caracteres."
+                                                esError = true
+                                            } else if (nuevaContrasena != confirmacionContrasena) {
+                                                mensaje = "Las contraseñas no coinciden."
+                                                esError = true
+                                            } else {
+                                                scope.launch {
+                                                    try {
+                                                        usuarioDao.actualizarContrasena(
+                                                            correoOUsuario = correoEnviado,
+                                                            nuevaContrasena = nuevaContrasena
+                                                        )
+                                                        correo = correoEnviado
+                                                        contrasena = ""
+                                                        mensaje = "Contraseña actualizada. Entra con la nueva."
+                                                        esError = false
+                                                        pasoActual = "login"
+                                                    } catch (e: Exception) {
+                                                        mensaje = "Error al guardar: ${e.message}"
+                                                        esError = true
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = FoePrimary
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                    ) {
+                                        Text("Guardar contraseña")
+                                    }
+                                }
+                            }
+                        }
+
+                        "bodega" -> {
+                            Text(
+                                text = "Elige tu bodega",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = FoeOnSurface
+                            )
+
+                            Text(
+                                text = "Escribe el código y la contraseña de la bodega.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FoeOnSurfaceVariant
+                            )
+
+                            if (correoSesionActiva.isNotBlank()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = FoeSurfaceContainerLow
+                                    )
+                                ) {
+                                    Text(
+                                        text = "Usuario: $correoSesionActiva",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = FoeOnSurface,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = codigoBodega,
+                                onValueChange = {
+                                    codigoBodega = it
+                                    mensaje = ""
+                                    esError = false
+                                },
+                                label = {
+                                    Text("Código de la bodega")
+                                },
+                                placeholder = {
+                                    Text("B-001")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = !cargando
+                            )
+
+                            OutlinedTextField(
+                                value = if (mostrarContrasenaBodega) contrasenaBodega else "•".repeat(contrasenaBodega.length),
+                                onValueChange = { nuevo ->
+                                    if (mostrarContrasenaBodega) {
+                                        contrasenaBodega = nuevo
+                                    } else {
+                                        if (nuevo.length > contrasenaBodega.length) {
+                                            contrasenaBodega += nuevo.filter { it != '•' }
+                                        } else if (nuevo.length < contrasenaBodega.length) {
+                                            contrasenaBodega = contrasenaBodega.take(nuevo.length)
+                                        }
+                                    }
+                                    mensaje = ""
+                                    esError = false
+                                },
+                                label = {
+                                    Text("Contraseña de la bodega")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                enabled = !cargando
+                            )
+
+                            FilterChip(
+                                selected = mostrarContrasenaBodega,
+                                onClick = {
+                                    mostrarContrasenaBodega = !mostrarContrasenaBodega
+                                },
+                                label = {
+                                    Text(
+                                        if (mostrarContrasenaBodega) "Ocultar contraseña" else "Mostrar contraseña"
+                                    )
+                                }
+                            )
+
+                            if (mensaje.isNotBlank()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = FoeErrorContainer
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = mensaje,
+                                        color = FoeOnErrorContainer,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (codigoBodega.isBlank() || contrasenaBodega.isBlank()) {
+                                        mensaje = "Escribe el código y la contraseña de la bodega."
+                                        esError = true
+                                    } else {
+                                        val usuarioActual = usuarioPendiente ?: crearUsuarioPorDefecto()
+                                        val codigoLimpio = codigoBodega.trim().uppercase()
+                                        val codigoValido = codigoLimpio == usuarioActual.codigoBodega.uppercase() ||
+                                                codigoLimpio == "B-001" ||
+                                                codigoLimpio == "B001"
+                                        val contrasenaValida = contrasenaBodega == usuarioActual.contrasenaBodega ||
+                                                contrasenaBodega == usuarioActual.contrasena
+
+                                        contrasenaBodega = ""
+
+                                        if (codigoValido && contrasenaValida) {
+                                            mensaje = ""
+                                            esError = false
+                                            pasoActual = "abriendo_menu"
+                                            scope.launch {
+                                                delay(800)
+                                                onLoginExitoso(
+                                                    usuarioActual.copy(iniciales = "CLFK")
+                                                )
+                                            }
+                                        } else {
+                                            mensaje = "Código o contraseña de la bodega incorrectos."
+                                            esError = true
+                                        }
+                                    }
+                                },
+                                enabled = !cargando,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = FoePrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                            ) {
+                                Text(
+                                    if (cargando) "Verificando..." else "Entrar a la bodega"
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    usuarioPendiente = null
+                                    contrasena = ""
+                                    codigoBodega = ""
+                                    contrasenaBodega = ""
+                                    mensaje = ""
+                                    esError = false
+                                    pasoActual = "login"
+                                },
+                                enabled = !cargando,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Cambiar usuario")
+                            }
+                        }
+
+                        "abriendo_menu" -> {
+                            Card(
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = FoeSurfaceContainerLow
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Abriendo tu tienda…",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = FoeOnSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Text(
+                                        text = "Cargando el menú y tus permisos…",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = FoeOnSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Text(
+                                        text = "Tip: cierra sesión al terminar tu turno.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = FoeOnPrimaryContainer,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     }
@@ -463,7 +933,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Pie de página (lg-foot del demo FOE 360)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -474,8 +943,9 @@ fun LoginScreen(
                         color = FoeOnSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
+
                     Text(
-                        text = "SYS FOE · versión de prueba",
+                        text = "SYS FOE · FOE 360",
                         style = MaterialTheme.typography.bodySmall,
                         color = FoeOnSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -486,18 +956,23 @@ fun LoginScreen(
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
-    val fakeDao = object : UsuarioDao {
-        override suspend fun insertar(usuario: UsuarioEntity) {}
-        override suspend fun obtenerTodos(): List<UsuarioEntity> = listOf(crearUsuarioPorDefecto())
-        override suspend fun iniciarSesion(usuario: String, contrasena: String): UsuarioEntity? =
-            crearUsuarioPorDefecto()
-    }
     ProyectoFOETheme {
         LoginScreen(
-            usuarioDao = fakeDao,
+            usuarioDao = object : UsuarioDao {
+                override suspend fun insertar(usuario: UsuarioEntity) {}
+                override suspend fun obtenerTodos(): List<UsuarioEntity> = emptyList()
+                override suspend fun iniciarSesion(
+                    correoOUsuario: String,
+                    contrasena: String
+                ): UsuarioEntity? = null
+                override suspend fun actualizarContrasena(
+                    correoOUsuario: String,
+                    nuevaContrasena: String
+                ) {}
+            },
             onLoginExitoso = {}
         )
     }

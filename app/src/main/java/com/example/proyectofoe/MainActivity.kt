@@ -3,6 +3,7 @@ package com.example.proyectofoe
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.room.Room
 import com.example.proyectofoe.local.FoeDatabase
+import com.example.proyectofoe.local.MIGRATION_2_3
 import com.example.proyectofoe.local.UsuarioEntity
 import com.example.proyectofoe.ui.screens.CLIENTES_S.ClientesScreen
 import com.example.proyectofoe.ui.screens.HOME_S.HomeScreen
@@ -21,68 +23,90 @@ import com.example.proyectofoe.ui.theme.ProyectoFOETheme
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var database: FoeDatabase
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
-        database = Room.databaseBuilder(
+        val db: FoeDatabase = Room.databaseBuilder(
             applicationContext,
             FoeDatabase::class.java,
             "foe360_db"
-        ).fallbackToDestructiveMigration(true).build()
+        ).addMigrations(MIGRATION_2_3)
+            .fallbackToDestructiveMigration(true)
+            .build()
 
         setContent {
             ProyectoFOETheme {
-                PantallaPrincipal(database)
+                PantallaPrincipal(db)
             }
         }
     }
 }
 
 @Composable
-private fun PantallaPrincipal(database: FoeDatabase) {
-    var usuarioAutenticado by remember { mutableStateOf<UsuarioEntity?>(null) }
-    var pantallaActual by remember { mutableStateOf("inicio") }
+fun PantallaPrincipal(
+    db: FoeDatabase
+) {
+    var usuarioAutenticado by remember {
+        mutableStateOf<UsuarioEntity?>(null)
+    }
+
+    var mostrarClientes by remember {
+        mutableStateOf(false)
+    }
+
+    var mostrarProductosDesdeClientes by remember {
+        mutableStateOf(false)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             usuarioAutenticado == null -> {
                 LoginScreen(
-                    usuarioDao = database.usuarioDao(),
+                    usuarioDao = db.usuarioDao(),
                     onLoginExitoso = { usuario ->
                         usuarioAutenticado = usuario
-                        pantallaActual = "inicio"
+                        mostrarClientes = false
+                        mostrarProductosDesdeClientes = false
                     }
                 )
             }
 
-            pantallaActual == "clientes" -> {
+            mostrarClientes -> {
                 ClientesScreen(
-                    clienteDao = database.clienteDao(),
-                    productoDao = database.productoDao(),
+                    clienteDao = db.clienteDao(),
+                    productoDao = db.productoDao(),
                     iniciarEnProductos = false,
-                    onVolverInicio = { pantallaActual = "inicio" }
+                    onVolverInicio = {
+                        mostrarClientes = false
+                    }
                 )
             }
 
-            pantallaActual == "clientes_productos" -> {
+            mostrarProductosDesdeClientes -> {
                 ClientesScreen(
-                    clienteDao = database.clienteDao(),
-                    productoDao = database.productoDao(),
+                    clienteDao = db.clienteDao(),
+                    productoDao = db.productoDao(),
                     iniciarEnProductos = true,
-                    onVolverInicio = { pantallaActual = "inicio" }
+                    onVolverInicio = {
+                        mostrarProductosDesdeClientes = false
+                    }
                 )
             }
 
             else -> {
                 HomeScreen(
                     usuario = usuarioAutenticado!!,
-                    onAbrirClientes = { pantallaActual = "clientes" },
-                    onAbrirProductosDesdeClientes = { pantallaActual = "clientes_productos" },
+                    onAbrirClientes = {
+                        mostrarClientes = true
+                    },
+                    onAbrirProductosDesdeClientes = {
+                        mostrarProductosDesdeClientes = true
+                    },
                     onCerrarSesion = {
                         usuarioAutenticado = null
-                        pantallaActual = "inicio"
+                        mostrarClientes = false
+                        mostrarProductosDesdeClientes = false
                     }
                 )
             }
