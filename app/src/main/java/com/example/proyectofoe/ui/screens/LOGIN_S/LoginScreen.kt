@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.proyectofoe.local.UsuarioDao
+import com.example.proyectofoe.local.UsuarioCLFK
 import com.example.proyectofoe.local.UsuarioEntity
 import com.example.proyectofoe.ui.theme.BrandNavy
 import com.example.proyectofoe.ui.theme.BrandRingGold
@@ -80,7 +80,7 @@ fun crearUsuarioPorDefecto(): UsuarioEntity {
 
 @Composable
 fun LoginScreen(
-    usuarioDao: UsuarioDao,
+    usuarioCLFK: UsuarioCLFK,
     onLoginExitoso: (UsuarioEntity) -> Unit
 ) {
     var pasoActual by remember {
@@ -161,11 +161,11 @@ fun LoginScreen(
 
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(usuarioDao) {
+    LaunchedEffect(usuarioCLFK) {
         try {
-            val existentes = usuarioDao.obtenerTodos()
+            val existentes = usuarioCLFK.obtenerTodos()
             if (existentes.isEmpty()) {
-                usuarioDao.insertar(crearUsuarioPorDefecto())
+                usuarioCLFK.insertar(crearUsuarioPorDefecto())
             }
         } catch (e: Exception) {
             mensaje = ""
@@ -401,15 +401,15 @@ fun LoginScreen(
 
                                         scope.launch {
                                             try {
-                                                val existentes = usuarioDao.obtenerTodos()
+                                                val existentes = usuarioCLFK.obtenerTodos()
                                                 if (existentes.isEmpty()) {
-                                                    usuarioDao.insertar(crearUsuarioPorDefecto())
+                                                    usuarioCLFK.insertar(crearUsuarioPorDefecto())
                                                 }
 
-                                                val encontrado = usuarioDao.iniciarSesion(
+                                                val encontrado = usuarioCLFK.iniciarSesion(
                                                     correoOUsuario = correoNormalizado,
                                                     contrasena = contrasena
-                                                ) ?: usuarioDao.iniciarSesion(
+                                                ) ?: usuarioCLFK.iniciarSesion(
                                                     correoOUsuario = textoCorreo,
                                                     contrasena = contrasena
                                                 )
@@ -692,7 +692,7 @@ fun LoginScreen(
                                             } else {
                                                 scope.launch {
                                                     try {
-                                                        usuarioDao.actualizarContrasena(
+                                                        usuarioCLFK.actualizarContrasena(
                                                             correoOUsuario = correoEnviado,
                                                             nuevaContrasena = nuevaContrasena
                                                         )
@@ -961,7 +961,7 @@ fun LoginScreen(
 fun LoginScreenPreview() {
     ProyectoFOETheme {
         LoginScreen(
-            usuarioDao = object : UsuarioDao {
+            usuarioCLFK = object : UsuarioCLFK {
                 override suspend fun insertar(usuario: UsuarioEntity) {}
                 override suspend fun obtenerTodos(): List<UsuarioEntity> = emptyList()
                 override suspend fun iniciarSesion(

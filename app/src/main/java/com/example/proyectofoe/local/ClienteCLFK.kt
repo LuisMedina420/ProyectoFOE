@@ -7,7 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 
 @Dao
-interface ClienteDao {
+interface ClienteCLFK {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertar(cliente: ClienteEntity)
 

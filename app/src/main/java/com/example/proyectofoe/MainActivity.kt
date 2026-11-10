@@ -61,7 +61,7 @@ fun PantallaPrincipal(
         when {
             usuarioAutenticado == null -> {
                 LoginScreen(
-                    usuarioDao = db.usuarioDao(),
+                    usuarioCLFK = db.usuarioCLFK(),
                     onLoginExitoso = { usuario ->
                         usuarioAutenticado = usuario
                         mostrarClientes = false
@@ -72,8 +72,8 @@ fun PantallaPrincipal(
 
             mostrarClientes -> {
                 ClientesScreen(
-                    clienteDao = db.clienteDao(),
-                    productoDao = db.productoDao(),
+                    clienteCLFK = db.clienteCLFK(),
+                    productoCLFK = db.productoCLFK(),
                     iniciarEnProductos = false,
                     onVolverInicio = {
                         mostrarClientes = false
@@ -83,8 +83,8 @@ fun PantallaPrincipal(
 
             mostrarProductosDesdeClientes -> {
                 ClientesScreen(
-                    clienteDao = db.clienteDao(),
-                    productoDao = db.productoDao(),
+                    clienteCLFK = db.clienteCLFK(),
+                    productoCLFK = db.productoCLFK(),
                     iniciarEnProductos = true,
                     onVolverInicio = {
                         mostrarProductosDesdeClientes = false

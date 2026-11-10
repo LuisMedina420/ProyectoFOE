@@ -14,9 +14,9 @@ import androidx.room.RoomDatabase
 )
 abstract class FoeDatabase : RoomDatabase() {
 
-    abstract fun usuarioDao(): UsuarioDao
+    abstract fun usuarioCLFK(): UsuarioCLFK
 
-    abstract fun clienteDao(): ClienteDao
+    abstract fun clienteCLFK(): ClienteCLFK
 
-    abstract fun productoDao(): ProductoDao
+    abstract fun productoCLFK(): ProductoCLFK
 }

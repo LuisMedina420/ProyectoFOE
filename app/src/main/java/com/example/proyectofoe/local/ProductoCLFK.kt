@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface ProductoDao {
+interface ProductoCLFK {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertar(producto: ProductoEntity)
 

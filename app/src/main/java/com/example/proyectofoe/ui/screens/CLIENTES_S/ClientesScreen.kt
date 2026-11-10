@@ -41,9 +41,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.proyectofoe.local.ClienteDao
+import com.example.proyectofoe.local.ClienteCLFK
 import com.example.proyectofoe.local.ClienteEntity
-import com.example.proyectofoe.local.ProductoDao
+import com.example.proyectofoe.local.ProductoCLFK
 import com.example.proyectofoe.local.ProductoEntity
 import com.example.proyectofoe.ui.theme.BrandNavy
 import com.example.proyectofoe.ui.theme.FoeCardBackground
@@ -374,8 +374,8 @@ fun validarPaso2NuevoCliente(
 
 @Composable
 fun ClientesScreen(
-    clienteDao: ClienteDao,
-    productoDao: ProductoDao,
+    clienteCLFK: ClienteCLFK,
+    productoCLFK: ProductoCLFK,
     iniciarEnProductos: Boolean = false,
     onVolverInicio: () -> Unit
 ) {
@@ -419,19 +419,19 @@ fun ClientesScreen(
     val scope = rememberCoroutineScope()
 
     // Carga inicial y semilla de Clientes y Productos en Room
-    LaunchedEffect(clienteDao, productoDao) {
+    LaunchedEffect(clienteCLFK, productoCLFK) {
         try {
-            var clientesDb = clienteDao.obtenerTodosOrdenadosPorNombre()
+            var clientesDb = clienteCLFK.obtenerTodosOrdenadosPorNombre()
             if (clientesDb.isEmpty()) {
-                clienteDao.insertarTodos(crearClientesPorDefecto())
-                clientesDb = clienteDao.obtenerTodosOrdenadosPorNombre()
+                clienteCLFK.insertarTodos(crearClientesPorDefecto())
+                clientesDb = clienteCLFK.obtenerTodosOrdenadosPorNombre()
             }
             listaClientes = clientesDb
 
-            var productosDb = productoDao.obtenerTodos()
+            var productosDb = productoCLFK.obtenerTodos()
             if (productosDb.isEmpty()) {
-                productoDao.insertarTodos(crearProductosPorDefecto())
-                productosDb = productoDao.obtenerTodos()
+                productoCLFK.insertarTodos(crearProductosPorDefecto())
+                productosDb = productoCLFK.obtenerTodos()
             }
             listaProductos = productosDb
 
@@ -771,8 +771,8 @@ fun ClientesScreen(
                             )
                             scope.launch {
                                 try {
-                                    clienteDao.insertar(nuevo)
-                                    listaClientes = clienteDao.obtenerTodosOrdenadosPorNombre()
+                                    clienteCLFK.insertar(nuevo)
+                                    listaClientes = clienteCLFK.obtenerTodosOrdenadosPorNombre()
                                 } catch (e: Exception) {
                                     listaClientes = (listaClientes + nuevo).sortedBy { it.nombreNegocio }
                                 }
@@ -2328,7 +2328,7 @@ private fun VistaNuevoCliente(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun ClientesScreenPreview() {
-    val fakeClienteDao = object : ClienteDao {
+    val fakeClienteCLFK = object : ClienteCLFK {
         override suspend fun insertar(cliente: ClienteEntity) {}
         override suspend fun insertarTodos(clientes: List<ClienteEntity>) {}
         override suspend fun actualizar(cliente: ClienteEntity) {}
@@ -2339,7 +2339,7 @@ fun ClientesScreenPreview() {
         override suspend fun obtenerPorId(id: Int): ClienteEntity? =
             crearClientesPorDefecto().firstOrNull()
     }
-    val fakeProductoDao = object : ProductoDao {
+    val fakeProductoCLFK = object : ProductoCLFK {
         override suspend fun insertar(producto: ProductoEntity) {}
         override suspend fun insertarTodos(productos: List<ProductoEntity>) {}
         override suspend fun obtenerTodos(): List<ProductoEntity> = crearProductosPorDefecto()
@@ -2348,8 +2348,8 @@ fun ClientesScreenPreview() {
     }
     ProyectoFOETheme {
         ClientesScreen(
-            clienteDao = fakeClienteDao,
-            productoDao = fakeProductoDao,
+            clienteCLFK = fakeClienteCLFK,
+            productoCLFK = fakeProductoCLFK,
             iniciarEnProductos = false,
             onVolverInicio = {}
         )
