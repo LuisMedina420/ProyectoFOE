@@ -1,17 +1,23 @@
 package com.example.proyectofoe.ui.screens.CLIENTES_S
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +41,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -43,11 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.proyectofoe.local.ClienteCLFK
 import com.example.proyectofoe.local.ClienteEntity
-import com.example.proyectofoe.local.ProductoCLFK
 import com.example.proyectofoe.local.ProductoEntity
+import com.example.proyectofoe.ui.components.CamaraSection
 import com.example.proyectofoe.ui.theme.BrandNavy
 import com.example.proyectofoe.ui.theme.FoeCardBackground
-import com.example.proyectofoe.ui.theme.FoeError
 import com.example.proyectofoe.ui.theme.FoeErrorContainer
 import com.example.proyectofoe.ui.theme.FoeOnErrorContainer
 import com.example.proyectofoe.ui.theme.FoeOnPrimaryContainer
@@ -57,23 +66,16 @@ import com.example.proyectofoe.ui.theme.FoeOutlineVariant
 import com.example.proyectofoe.ui.theme.FoePrimary
 import com.example.proyectofoe.ui.theme.FoePrimaryContainer
 import com.example.proyectofoe.ui.theme.FoeSurface
-import com.example.proyectofoe.ui.theme.FoeSurfaceContainerHigh
 import com.example.proyectofoe.ui.theme.FoeSurfaceContainerLow
-import com.example.proyectofoe.ui.theme.ModuloAcero
 import com.example.proyectofoe.ui.theme.ModuloAmbar
 import com.example.proyectofoe.ui.theme.ModuloCoral
 import com.example.proyectofoe.ui.theme.ModuloRojo
 import com.example.proyectofoe.ui.theme.ModuloVerde
-import com.example.proyectofoe.ui.theme.ModuloVioleta
 import com.example.proyectofoe.ui.theme.OnBrandNavy
 import com.example.proyectofoe.ui.theme.OnBrandSubtitle
 import com.example.proyectofoe.ui.theme.ProyectoFOETheme
 import kotlinx.coroutines.launch
 import java.util.Locale
-
-const val LIMITE_CREDITO_CENTAVOS = 1000000 // L 10,000.00
-const val DESCUENTO_PORCENTAJE = 5
-const val MINIMO_MAYORISTA_CENTAVOS = 500000 // L 5,000.00
 
 fun formatearLempiras(centavos: Int): String {
     val lempiras = centavos / 100.0
@@ -340,23 +342,6 @@ fun crearProductosPorDefecto(): List<ProductoEntity> {
     )
 }
 
-fun parsearSugeridos(cadena: String): Map<Int, Int> {
-    if (cadena.isBlank()) return emptyMap()
-    val mapa = mutableMapOf<Int, Int>()
-    val pares = cadena.split(",")
-    for (par in pares) {
-        val partes = par.trim().split(":")
-        if (partes.size == 2) {
-            val idProd = partes[0].toIntOrNull()
-            val cant = partes[1].toIntOrNull()
-            if (idProd != null && cant != null && cant > 0) {
-                mapa[idProd] = cant
-            }
-        }
-    }
-    return mapa
-}
-
 fun validarPaso1NuevoCliente(nombreNegocio: String, dueno: String, telefono: String): Boolean {
     val digitosTelefono = telefono.filter { it.isDigit() }
     return nombreNegocio.trim().length > 2 &&
@@ -372,24 +357,35 @@ fun validarPaso2NuevoCliente(
     return tieneFoto && tieneGps && direccion.trim().length > 2
 }
 
+fun convertirLempirasACentavos(textoPrecio: String): Int {
+    val limpio = textoPrecio.trim().replace(",", ".")
+    val valor = limpio.toDoubleOrNull() ?: 0.0
+    return (valor * 100).toInt().coerceAtLeast(0)
+}
+
+fun validarNuevoProducto(
+    nombre: String,
+    presentacion: String,
+    precioLempiras: String
+): Boolean {
+    val centavos = convertirLempirasACentavos(precioLempiras)
+    return nombre.trim().length > 2 &&
+            presentacion.trim().length > 1 &&
+            centavos > 0
+}
+
 @Composable
 fun ClientesScreen(
     clienteCLFK: ClienteCLFK,
-    productoCLFK: ProductoCLFK,
-    iniciarEnProductos: Boolean = false,
     onVolverInicio: () -> Unit
 ) {
     var listaClientes by remember { mutableStateOf(emptyList<ClienteEntity>()) }
-    var listaProductos by remember { mutableStateOf(emptyList<ProductoEntity>()) }
 
-    // Subvistas del módulo de Clientes:
+    // Subvistas del módulo independiente de Clientes:
     // "lista" -> Cartera de clientes
     // "detalle" -> Ficha de un cliente específico
-    // "productos" -> Visualización de productos integrada en Clientes
     // "nuevo" -> Alta rápida de nuevo cliente en 2 pasos
-    var subvista by remember {
-        mutableStateOf(if (iniciarEnProductos) "productos" else "lista")
-    }
+    var subvista by remember { mutableStateOf("lista") }
 
     var clienteSeleccionado by remember { mutableStateOf<ClienteEntity?>(null) }
 
@@ -397,14 +393,7 @@ fun ClientesScreen(
     var busquedaCliente by remember { mutableStateOf("") }
     var filtroCartera by remember { mutableStateOf("todos") } // "todos", "ok", "warn", "bad"
 
-    // Estados de visualización de productos dentro de Clientes
-    var busquedaProducto by remember { mutableStateOf("") }
-    var categoriaProducto by remember { mutableStateOf("todo") } // "todo", "sug", "granos", "aceites", "bebidas", "limpieza", "lacteos"
-    var cantidadesSeleccionadas by remember { mutableStateOf(mapOf<Int, Int>()) }
-    var aplicarDescuento by remember { mutableStateOf(false) }
-    var mostrarSelectorClienteEnProductos by remember { mutableStateOf(false) }
-
-    // Estados para Nuevo Cliente (2 pasos como en el demo FOE 360)
+    // Estados para Nuevo Cliente (2 pasos)
     var pasoNuevoCliente by remember { mutableStateOf(0) }
     var nuevoNombreNegocio by remember { mutableStateOf("") }
     var nuevoDueno by remember { mutableStateOf("") }
@@ -412,14 +401,16 @@ fun ClientesScreen(
     var nuevoRtnODni by remember { mutableStateOf("") }
     var nuevoPideCredito by remember { mutableStateOf(false) }
     var nuevoFotoTomada by remember { mutableStateOf(false) }
+    var nuevoFotoUri by remember { mutableStateOf<String?>(null) }
     var nuevoDireccion by remember { mutableStateOf("") }
     var nuevoGpsGuardado by remember { mutableStateOf(false) }
+
     var mensajeAviso by remember { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
-    // Carga inicial y semilla de Clientes y Productos en Room
-    LaunchedEffect(clienteCLFK, productoCLFK) {
+    // Carga inicial y semilla de Clientes en Room
+    LaunchedEffect(clienteCLFK) {
         try {
             var clientesDb = clienteCLFK.obtenerTodosOrdenadosPorNombre()
             if (clientesDb.isEmpty()) {
@@ -428,19 +419,11 @@ fun ClientesScreen(
             }
             listaClientes = clientesDb
 
-            var productosDb = productoCLFK.obtenerTodos()
-            if (productosDb.isEmpty()) {
-                productoCLFK.insertarTodos(crearProductosPorDefecto())
-                productosDb = productoCLFK.obtenerTodos()
-            }
-            listaProductos = productosDb
-
             if (clienteSeleccionado == null) {
                 clienteSeleccionado = clientesDb.find { it.parada == 5 } ?: clientesDb.firstOrNull()
             }
         } catch (e: Exception) {
             listaClientes = crearClientesPorDefecto().sortedBy { it.nombreNegocio }
-            listaProductos = crearProductosPorDefecto()
             if (clienteSeleccionado == null) {
                 clienteSeleccionado = listaClientes.find { it.parada == 5 } ?: listaClientes.firstOrNull()
             }
@@ -457,8 +440,9 @@ fun ClientesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
-            // BARRA SUPERIOR AZUL MARINO (bar del demo FOE 360)
+            // BARRA SUPERIOR DEL MÓDULO DE CLIENTES
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -476,13 +460,6 @@ fun ClientesScreen(
                             when (subvista) {
                                 "detalle" -> subvista = "lista"
                                 "nuevo" -> subvista = "lista"
-                                "productos" -> {
-                                    if (iniciarEnProductos) {
-                                        onVolverInicio()
-                                    } else {
-                                        subvista = "lista"
-                                    }
-                                }
                                 else -> onVolverInicio()
                             }
                         },
@@ -501,13 +478,11 @@ fun ClientesScreen(
                     ) {
                         val tituloBarra = when (subvista) {
                             "detalle" -> clienteActivo?.nombreNegocio ?: "Detalle del cliente"
-                            "productos" -> "Productos · Clientes"
                             "nuevo" -> "Nuevo cliente"
                             else -> "Clientes"
                         }
                         val subtituloBarra = when (subvista) {
                             "detalle" -> "Parada ${clienteActivo?.parada ?: 1} de ${listaClientes.size} · ${clienteActivo?.dueno ?: ""}"
-                            "productos" -> "Catálogo integrado en el apartado de Clientes"
                             "nuevo" -> "Registro guiado del cliente"
                             else -> "${listaClientes.size} en la ruta · cartera"
                         }
@@ -535,6 +510,7 @@ fun ClientesScreen(
                                 nuevoRtnODni = ""
                                 nuevoPideCredito = false
                                 nuevoFotoTomada = false
+                                nuevoFotoUri = null
                                 nuevoDireccion = ""
                                 nuevoGpsGuardado = false
                                 mensajeAviso = ""
@@ -546,49 +522,6 @@ fun ClientesScreen(
                             )
                         ) {
                             Text("+ Nuevo")
-                        }
-                    }
-                }
-
-                // Selector integrado dentro del módulo de Clientes: Cartera de Clientes <-> Visualización de Productos
-                if (subvista != "nuevo") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                subvista = "lista"
-                                mostrarSelectorClienteEnProductos = false
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (subvista == "lista" || subvista == "detalle") FoePrimary else FoeSurfaceContainerLow,
-                                contentColor = if (subvista == "lista" || subvista == "detalle") Color.White else FoeOnSurface
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "Cartera de clientes (${listaClientes.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                subvista = "productos"
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (subvista == "productos") ModuloAcero else FoeSurfaceContainerLow,
-                                contentColor = if (subvista == "productos") Color.White else FoeOnSurface
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "Productos (${listaProductos.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
                         }
                     }
                 }
@@ -628,7 +561,7 @@ fun ClientesScreen(
                 }
             }
 
-            // CONTENIDO SEGÚN SUBVISTA
+            // CONTENIDO SEGÚN SUBVISTA DEL MÓDULO DE CLIENTES
             when (subvista) {
                 "lista" -> {
                     VistaCarteraClientes(
@@ -641,12 +574,6 @@ fun ClientesScreen(
                             clienteSeleccionado = cli
                             subvista = "detalle"
                         },
-                        onVerProductosDeCliente = { cli ->
-                            clienteSeleccionado = cli
-                            categoriaProducto = "todo"
-                            mostrarSelectorClienteEnProductos = false
-                            subvista = "productos"
-                        },
                         onNuevoCliente = {
                             pasoNuevoCliente = 0
                             nuevoNombreNegocio = ""
@@ -655,6 +582,7 @@ fun ClientesScreen(
                             nuevoRtnODni = ""
                             nuevoPideCredito = false
                             nuevoFotoTomada = false
+                            nuevoFotoUri = null
                             nuevoDireccion = ""
                             nuevoGpsGuardado = false
                             subvista = "nuevo"
@@ -666,66 +594,9 @@ fun ClientesScreen(
                     if (clienteActivo != null) {
                         VistaDetalleCliente(
                             cliente = clienteActivo,
-                            productos = listaProductos,
-                            onVolverLista = { subvista = "lista" },
-                            onVerCatalogoProductos = { soloSugeridos ->
-                                categoriaProducto = if (soloSugeridos) "sug" else "todo"
-                                mostrarSelectorClienteEnProductos = false
-                                subvista = "productos"
-                            },
-                            onCargarCanastaSugerida = { mapaSugeridos ->
-                                cantidadesSeleccionadas = mapaSugeridos
-                                categoriaProducto = "sug"
-                                mostrarSelectorClienteEnProductos = false
-                                mensajeAviso = "Canasta sugerida cargada para ${clienteActivo.nombreNegocio}."
-                                subvista = "productos"
-                            }
+                            onVolverLista = { subvista = "lista" }
                         )
                     }
-                }
-
-                "productos" -> {
-                    VistaProductosEnClientes(
-                        clientes = listaClientes,
-                        clienteActivo = clienteActivo,
-                        mostrarSelectorCliente = mostrarSelectorClienteEnProductos,
-                        onToggleSelectorCliente = {
-                            mostrarSelectorClienteEnProductos = !mostrarSelectorClienteEnProductos
-                        },
-                        onSeleccionarCliente = { nuevoCli ->
-                            clienteSeleccionado = nuevoCli
-                            mostrarSelectorClienteEnProductos = false
-                            if (categoriaProducto == "sug" && parsearSugeridos(nuevoCli.sugeridos).isEmpty()) {
-                                categoriaProducto = "todo"
-                            }
-                        },
-                        onVerFichaClienteActivo = {
-                            if (clienteActivo != null) {
-                                subvista = "detalle"
-                            }
-                        },
-                        productos = listaProductos,
-                        busqueda = busquedaProducto,
-                        onBusquedaChange = { busquedaProducto = it },
-                        categoriaSeleccionada = categoriaProducto,
-                        onCategoriaChange = { categoriaProducto = it },
-                        cantidades = cantidadesSeleccionadas,
-                        onCambiarCantidad = { idProd, nuevaCant ->
-                            val mapaMutable = cantidadesSeleccionadas.toMutableMap()
-                            if (nuevaCant <= 0) {
-                                mapaMutable.remove(idProd)
-                            } else {
-                                mapaMutable[idProd] = nuevaCant
-                            }
-                            cantidadesSeleccionadas = mapaMutable
-                        },
-                        onLimpiarSeleccion = {
-                            cantidadesSeleccionadas = emptyMap()
-                            aplicarDescuento = false
-                        },
-                        aplicarDescuento = aplicarDescuento,
-                        onToggleDescuento = { aplicarDescuento = !aplicarDescuento }
-                    )
                 }
 
                 "nuevo" -> {
@@ -742,7 +613,11 @@ fun ClientesScreen(
                         pideCredito = nuevoPideCredito,
                         onPideCreditoChange = { nuevoPideCredito = it },
                         fotoTomada = nuevoFotoTomada,
-                        onTomarFoto = { nuevoFotoTomada = true },
+                        fotoUri = nuevoFotoUri,
+                        onFotoCapturada = { uri ->
+                            nuevoFotoUri = uri
+                            nuevoFotoTomada = true
+                        },
                         direccion = nuevoDireccion,
                         onDireccionChange = { nuevoDireccion = it },
                         gpsGuardado = nuevoGpsGuardado,
@@ -767,7 +642,8 @@ fun ClientesScreen(
                                 pideCredito = nuevoPideCredito,
                                 tieneFotoFachada = nuevoFotoTomada,
                                 tieneUbicacionGps = nuevoGpsGuardado,
-                                sugeridos = "1:1,8:1"
+                                sugeridos = "1:1,8:1",
+                                fotoUri = nuevoFotoUri
                             )
                             scope.launch {
                                 try {
@@ -780,7 +656,7 @@ fun ClientesScreen(
                                     it.nombreNegocio == nuevo.nombreNegocio && it.parada == nuevo.parada
                                 } ?: nuevo
                                 mensajeAviso =
-                                    "Cliente registrado: ${nuevo.nombreNegocio} (Parada $siguienteParada · cliente normal${if (nuevo.pideCredito) " · pide crédito" else ""})."
+                                    "Cliente registrado: ${nuevo.nombreNegocio} (Total en ruta: ${listaClientes.size})."
                                 subvista = "lista"
                             }
                         }
@@ -799,7 +675,6 @@ private fun VistaCarteraClientes(
     filtroCartera: String,
     onFiltroCarteraChange: (String) -> Unit,
     onAbrirDetalleCliente: (ClienteEntity) -> Unit,
-    onVerProductosDeCliente: (ClienteEntity) -> Unit,
     onNuevoCliente: () -> Unit
 ) {
     val consulta = busqueda.trim().lowercase()
@@ -829,7 +704,6 @@ private fun VistaCarteraClientes(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Buscador de clientes (search del demo FOE 360)
         OutlinedTextField(
             value = busqueda,
             onValueChange = onBusquedaChange,
@@ -838,7 +712,6 @@ private fun VistaCarteraClientes(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Chips de filtro de cartera
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -913,8 +786,7 @@ private fun VistaCarteraClientes(
             clientesFiltrados.forEach { cliente ->
                 TarjetaClienteItem(
                     cliente = cliente,
-                    onAbrirDetalle = { onAbrirDetalleCliente(cliente) },
-                    onVerProductos = { onVerProductosDeCliente(cliente) }
+                    onAbrirDetalle = { onAbrirDetalleCliente(cliente) }
                 )
             }
         }
@@ -924,8 +796,7 @@ private fun VistaCarteraClientes(
 @Composable
 private fun TarjetaClienteItem(
     cliente: ClienteEntity,
-    onAbrirDetalle: () -> Unit,
-    onVerProductos: () -> Unit
+    onAbrirDetalle: () -> Unit
 ) {
     val colorEstado = when (cliente.estadoCredito) {
         "bad" -> ModuloRojo
@@ -952,7 +823,6 @@ private fun TarjetaClienteItem(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Insignia con iniciales del dueño (igual a V.clientes del demo)
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
@@ -1042,23 +912,10 @@ private fun TarjetaClienteItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                OutlinedButton(
+                    onClick = onAbrirDetalle
                 ) {
-                    OutlinedButton(
-                        onClick = onAbrirDetalle
-                    ) {
-                        Text("Ficha", fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = onVerProductos,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ModuloAcero,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Ver productos", fontSize = 12.sp)
-                    }
+                    Text("Ver ficha", fontSize = 12.sp)
                 }
             }
         }
@@ -1068,23 +925,28 @@ private fun TarjetaClienteItem(
 @Composable
 private fun VistaDetalleCliente(
     cliente: ClienteEntity,
-    productos: List<ProductoEntity>,
-    onVolverLista: () -> Unit,
-    onVerCatalogoProductos: (Boolean) -> Unit,
-    onCargarCanastaSugerida: (Map<Int, Int>) -> Unit
+    onVolverLista: () -> Unit
 ) {
-    val mapaSugeridos = parsearSugeridos(cliente.sugeridos)
-    val productosSugeridos = mapaSugeridos.mapNotNull { (idProd, cant) ->
-        val prod = productos.find { it.id == idProd }
-        if (prod != null) Pair(prod, cant) else null
+    val context = LocalContext.current
+    val fotoBitmap = remember(cliente.fotoUri) {
+        cliente.fotoUri
+            ?.takeIf { it.isNotBlank() }
+            ?.let { uriTexto ->
+                try {
+                    context.contentResolver.openInputStream(
+                        Uri.parse(uriTexto)
+                    )?.use { input ->
+                        BitmapFactory.decodeStream(input)
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
     }
-    val totalSugeridoCentavos = productosSugeridos.sumOf { (prod, cant) ->
-        val subtotal = prod.precioCentavos * cant
-        val isv = (subtotal * prod.isvPorcentaje) / 100
-        subtotal + isv
-    }
-    val disponibleCentavos = (LIMITE_CREDITO_CENTAVOS - cliente.saldoCentavos).coerceAtLeast(0)
-    val porcentajeUsado = ((cliente.saldoCentavos.toDouble() / LIMITE_CREDITO_CENTAVOS) * 100)
+
+    val limiteCreditoCentavos = 1000000
+    val disponibleCentavos = (limiteCreditoCentavos - cliente.saldoCentavos).coerceAtLeast(0)
+    val porcentajeUsado = ((cliente.saldoCentavos.toDouble() / limiteCreditoCentavos) * 100)
         .toInt()
         .coerceIn(0, 100)
 
@@ -1098,10 +960,9 @@ private fun VistaDetalleCliente(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Cabecera de la parada / cliente (V.parada del demo FOE 360)
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = FoeCardBackground),
@@ -1113,6 +974,18 @@ private fun VistaDetalleCliente(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (fotoBitmap != null) {
+                    Image(
+                        bitmap = fotoBitmap.asImageBitmap(),
+                        contentDescription = "Fotografía de la fachada",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1157,6 +1030,13 @@ private fun VistaDetalleCliente(
                             style = MaterialTheme.typography.bodySmall,
                             color = FoeOnSurfaceVariant
                         )
+                        if (cliente.rtnODni.isNotBlank()) {
+                            Text(
+                                text = "RTN / DNI: ${cliente.rtnODni}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = FoeOnSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -1192,7 +1072,6 @@ private fun VistaDetalleCliente(
             }
         }
 
-        // Tarjeta de Crédito y Cartera del cliente (credito de V.parada en el demo)
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = FoeCardBackground),
@@ -1251,7 +1130,7 @@ private fun VistaDetalleCliente(
                         color = FoeOnSurfaceVariant
                     )
                     Text(
-                        text = "Límite ${formatearLempiras(LIMITE_CREDITO_CENTAVOS)}",
+                        text = "Límite ${formatearLempiras(limiteCreditoCentavos)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = FoeOnSurfaceVariant
                     )
@@ -1275,734 +1154,11 @@ private fun VistaDetalleCliente(
             }
         }
 
-        // Canasta sugerida integrada con los Productos del cliente (sug de V.parada en el demo)
-        if (productosSugeridos.isNotEmpty()) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = FoeCardBackground),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Canasta sugerida para este cliente",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = FoeOnSurface
-                        )
-                        Text(
-                            text = formatearLempiras(totalSugeridoCentavos),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = FoePrimary
-                        )
-                    }
-
-                    Text(
-                        text = "Productos habituales según el historial de compras del cliente:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = FoeOnSurfaceVariant
-                    )
-
-                    productosSugeridos.forEach { (prod, cant) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(FoeSurfaceContainerLow, RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = prod.nombre,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = FoeOnSurface
-                                )
-                                Text(
-                                    text = "${prod.presentacion} · ${formatearLempiras(prod.precioCentavos)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = FoeOnSurfaceVariant
-                                )
-                            }
-                            Card(
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = FoePrimaryContainer)
-                            ) {
-                                Text(
-                                    text = "x$cant",
-                                    color = FoeOnPrimaryContainer,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { onCargarCanastaSugerida(mapaSugeridos) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = FoePrimaryContainer,
-                                contentColor = FoeOnPrimaryContainer
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cargar sugeridos")
-                        }
-
-                        Button(
-                            onClick = { onVerCatalogoProductos(false) },
-                            colors = ButtonDefaults.buttonColors(containerColor = ModuloAcero),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Ver todos los productos")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Botón principal para visualizar todos los productos desde este cliente
-        Button(
-            onClick = { onVerCatalogoProductos(false) },
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = FoePrimary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-        ) {
-            Text(
-                text = "Visualizar catálogo de productos (${productos.size})",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
         OutlinedButton(
             onClick = onVolverLista,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Volver a la lista de clientes")
-        }
-    }
-}
-
-@Composable
-private fun VistaProductosEnClientes(
-    clientes: List<ClienteEntity>,
-    clienteActivo: ClienteEntity?,
-    mostrarSelectorCliente: Boolean,
-    onToggleSelectorCliente: () -> Unit,
-    onSeleccionarCliente: (ClienteEntity) -> Unit,
-    onVerFichaClienteActivo: () -> Unit,
-    productos: List<ProductoEntity>,
-    busqueda: String,
-    onBusquedaChange: (String) -> Unit,
-    categoriaSeleccionada: String,
-    onCategoriaChange: (String) -> Unit,
-    cantidades: Map<Int, Int>,
-    onCambiarCantidad: (Int, Int) -> Unit,
-    onLimpiarSeleccion: () -> Unit,
-    aplicarDescuento: Boolean,
-    onToggleDescuento: () -> Unit
-) {
-    val mapaSugeridosCliente = parsearSugeridos(clienteActivo?.sugeridos ?: "")
-    val consulta = busqueda.trim().lowercase()
-
-    val productosFiltrados = productos.filter { p ->
-        val coincideCategoria = when (categoriaSeleccionada) {
-            "todo" -> true
-            "sug" -> mapaSugeridosCliente.containsKey(p.id)
-            else -> p.categoria == categoriaSeleccionada
-        }
-        val coincideBusqueda = consulta.isEmpty() ||
-                p.nombre.lowercase().contains(consulta) ||
-                p.presentacion.lowercase().contains(consulta) ||
-                p.categoria.lowercase().contains(consulta)
-        coincideCategoria && coincideBusqueda
-    }
-
-    // Cálculo de totales de productos seleccionados para el cliente activo (igual a cartT() del demo)
-    var exentoBruto = 0
-    var gravadoBruto = 0
-    var totalBultos = 0
-    var totalRenglones = 0
-    for ((idProd, cant) in cantidades) {
-        if (cant <= 0) continue
-        val prod = productos.find { it.id == idProd } ?: continue
-        totalRenglones += 1
-        totalBultos += cant
-        if (prod.isvPorcentaje > 0) {
-            gravadoBruto += prod.precioCentavos * cant
-        } else {
-            exentoBruto += prod.precioCentavos * cant
-        }
-    }
-    val esMayorista = (exentoBruto + gravadoBruto) >= MINIMO_MAYORISTA_CENTAVOS
-    val descExento = if (aplicarDescuento) (exentoBruto * DESCUENTO_PORCENTAJE) / 100 else 0
-    val descGravado = if (aplicarDescuento) (gravadoBruto * DESCUENTO_PORCENTAJE) / 100 else 0
-    val exentoNeto = exentoBruto - descExento
-    val gravadoNeto = gravadoBruto - descGravado
-    val isvCentavos = (gravadoNeto * 15) / 100
-    val totalCentavos = exentoNeto + gravadoNeto + isvCentavos
-    val descuentoTotal = descExento + descGravado
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // FRANJA DEL CLIENTE ACTIVO (cli-strip del demo FOE 360)
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = FoeSurfaceContainerLow),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "CLIENTE SELECCIONADO",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = FoePrimary
-                        )
-                        Text(
-                            text = if (clienteActivo != null) {
-                                "Parada ${clienteActivo.parada} · ${clienteActivo.nombreNegocio}"
-                            } else {
-                                "Sin cliente seleccionado"
-                            },
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = FoeOnSurface
-                        )
-                        if (clienteActivo != null) {
-                            Text(
-                                text = "${clienteActivo.dueno} · ${clienteActivo.textoCredito} · Saldo ${formatearLempiras(clienteActivo.saldoCentavos)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = FoeOnSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(onClick = onVerFichaClienteActivo) {
-                            Text("Ficha", fontSize = 12.sp)
-                        }
-                        Button(
-                            onClick = onToggleSelectorCliente,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = FoePrimary,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text(if (mostrarSelectorCliente) "Cerrar" else "Cambiar", fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                // Lista desplegable para cambiar de cliente sin salir de la vista de productos
-                if (mostrarSelectorCliente) {
-                    HorizontalDivider(color = FoeOutlineVariant)
-                    Text(
-                        text = "Selecciona el cliente para ver sus productos y sugeridos:",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = FoeOnSurfaceVariant
-                    )
-                    clientes.sortedBy { it.parada }.forEach { cli ->
-                        val seleccionado = clienteActivo?.id == cli.id
-                        Card(
-                            onClick = { onSeleccionarCliente(cli) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (seleccionado) FoePrimaryContainer else FoeCardBackground
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Parada ${cli.parada} · ${cli.nombreNegocio}",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = if (seleccionado) FoeOnPrimaryContainer else FoeOnSurface
-                                    )
-                                    Text(
-                                        text = "${cli.dueno} · ${cli.textoCredito}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = FoeOnSurfaceVariant
-                                    )
-                                }
-                                if (seleccionado) {
-                                    Text(
-                                        text = "Activo",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = FoeOnPrimaryContainer
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Buscador de productos (pq del demo FOE 360)
-        OutlinedTextField(
-            value = busqueda,
-            onValueChange = onBusquedaChange,
-            label = { Text("Buscar producto o presentación") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Categorías de productos (CATS del demo FOE 360)
-        Text(
-            text = "CATEGORÍAS DE PRODUCTOS",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = FoeOnSurfaceVariant
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FilterChip(
-                selected = categoriaSeleccionada == "todo",
-                onClick = { onCategoriaChange("todo") },
-                label = { Text("Todo (${productos.size})") }
-            )
-            FilterChip(
-                selected = categoriaSeleccionada == "sug",
-                onClick = { onCategoriaChange("sug") },
-                label = { Text("Sugeridos (${mapaSugeridosCliente.size})") }
-            )
-            FilterChip(
-                selected = categoriaSeleccionada == "granos",
-                onClick = { onCategoriaChange("granos") },
-                label = { Text("Granos") }
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FilterChip(
-                selected = categoriaSeleccionada == "aceites",
-                onClick = { onCategoriaChange("aceites") },
-                label = { Text("Aceites") }
-            )
-            FilterChip(
-                selected = categoriaSeleccionada == "bebidas",
-                onClick = { onCategoriaChange("bebidas") },
-                label = { Text("Bebidas") }
-            )
-            FilterChip(
-                selected = categoriaSeleccionada == "limpieza",
-                onClick = { onCategoriaChange("limpieza") },
-                label = { Text("Limpieza") }
-            )
-            FilterChip(
-                selected = categoriaSeleccionada == "lacteos",
-                onClick = { onCategoriaChange("lacteos") },
-                label = { Text("Lácteos") }
-            )
-        }
-
-        // Resumen de productos seleccionados para este cliente (si hay alguno)
-        if (totalBultos > 0) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = FoePrimaryContainer),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Selección para ${clienteActivo?.nombreNegocio ?: "el cliente"}",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = FoeOnPrimaryContainer,
-                            fontSize = 15.sp
-                        )
-                        Text(
-                            text = "$totalRenglones prod. · $totalBultos bultos",
-                            fontWeight = FontWeight.Bold,
-                            color = FoeOnPrimaryContainer,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    if (esMayorista) {
-                        Text(
-                            text = "Compra de mayorista alcanzada (supera L 5,000.00)",
-                            color = ModuloVerde,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    if (descuentoTotal > 0) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Descuento $DESCUENTO_PORCENTAJE %:", fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                            Text("- ${formatearLempiras(descuentoTotal)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FoeOnPrimaryContainer)
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Importe exento:", fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                        Text(formatearLempiras(exentoNeto), fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Importe gravado 15 %:", fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                        Text(formatearLempiras(gravadoNeto), fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("ISV 15 %:", fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                        Text(formatearLempiras(isvCentavos), fontSize = 12.sp, color = FoeOnPrimaryContainer)
-                    }
-
-                    HorizontalDivider(color = FoeOutlineVariant)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Total estimado",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = FoeOnPrimaryContainer
-                        )
-                        Text(
-                            text = formatearLempiras(totalCentavos),
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
-                            color = FoeOnPrimaryContainer
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onToggleDescuento,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = if (aplicarDescuento) "Quitar desc. 5%" else "Aplicar desc. 5%",
-                                fontSize = 12.sp
-                            )
-                        }
-                        OutlinedButton(
-                            onClick = onLimpiarSeleccion,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Limpiar selección", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Lista de tarjetas de productos (pcHTML del demo FOE 360)
-        if (productosFiltrados.isEmpty()) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = FoeCardBackground),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = if (categoriaSeleccionada == "sug") {
-                            "Sin sugerencias para este cliente"
-                        } else {
-                            "Ningún producto coincide"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = FoeOnSurface
-                    )
-                    Text(
-                        text = "Puedes ver todo el catálogo de productos.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FoeOnSurfaceVariant
-                    )
-                    Button(onClick = { onCategoriaChange("todo") }) {
-                        Text("Ver todo")
-                    }
-                }
-            }
-        } else {
-            productosFiltrados.forEach { prod ->
-                val cantActual = cantidades[prod.id] ?: 0
-                val cantSugerida = mapaSugeridosCliente[prod.id]
-                TarjetaProductoItem(
-                    producto = prod,
-                    cantidadSeleccionada = cantActual,
-                    cantidadSugerida = cantSugerida,
-                    onCambiarCantidad = { nueva -> onCambiarCantidad(prod.id, nueva) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TarjetaProductoItem(
-    producto: ProductoEntity,
-    cantidadSeleccionada: Int,
-    cantidadSugerida: Int?,
-    onCambiarCantidad: (Int) -> Unit
-) {
-    val colorCategoria = when (producto.categoria) {
-        "granos" -> ModuloAmbar
-        "aceites" -> ModuloCoral
-        "bebidas" -> ModuloAcero
-        "limpieza" -> ModuloVerde
-        "lacteos" -> ModuloVioleta
-        else -> FoePrimary
-    }
-    val nombreCategoria = when (producto.categoria) {
-        "granos" -> "Granos"
-        "aceites" -> "Aceites"
-        "bebidas" -> "Bebidas"
-        "limpieza" -> "Limpieza"
-        "lacteos" -> "Lácteos y café"
-        else -> producto.categoria
-    }
-
-    val disponibleCamion = (producto.stockCamion - cantidadSeleccionada).coerceAtLeast(0)
-    val agotado = producto.stockCamion <= 0
-
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (cantidadSeleccionada > 0) FoeSurfaceContainerLow else FoeCardBackground
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = colorCategoria)
-                    ) {
-                        Text(
-                            text = "$nombreCategoria · ${producto.tipoEmpaque}",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    if (cantidadSugerida != null) {
-                        Card(
-                            shape = RoundedCornerShape(8.dp),
-                            colors = CardDefaults.cardColors(containerColor = FoePrimaryContainer)
-                        ) {
-                            Text(
-                                text = "Sugerido ($cantidadSugerida)",
-                                color = FoeOnPrimaryContainer,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Indicador de existencia en el camión y depósito
-                Card(
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            agotado -> FoeErrorContainer
-                            disponibleCamion <= 3 -> ModuloAmbar
-                            else -> FoeSurfaceContainerHigh
-                        }
-                    )
-                ) {
-                    Text(
-                        text = if (agotado) {
-                            "Sin existencia"
-                        } else {
-                            "Camión: $disponibleCamion · Depósito: ${producto.stockDeposito}"
-                        },
-                        color = when {
-                            agotado -> FoeOnErrorContainer
-                            disponibleCamion <= 3 -> Color.White
-                            else -> FoeOnSurface
-                        },
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = producto.nombre,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = FoeOnSurface
-                    )
-                    Text(
-                        text = producto.presentacion,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = FoeOnSurfaceVariant
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = formatearLempiras(producto.precioCentavos),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = FoeOnSurface
-                    )
-                    Text(
-                        text = if (producto.isvPorcentaje > 0) "+ ISV ${producto.isvPorcentaje} %" else "Exento",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = FoeOnSurfaceVariant
-                    )
-                }
-            }
-
-            // Controles para seleccionar / ajustar unidades del producto para el cliente
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (cantidadSeleccionada > 0) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { onCambiarCantidad(cantidadSeleccionada - 1) }
-                        ) {
-                            Text(if (cantidadSeleccionada == 1) "Quitar" else "-")
-                        }
-                        Text(
-                            text = "$cantidadSeleccionada",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = FoeOnSurface
-                        )
-                        Button(
-                            onClick = {
-                                if (cantidadSeleccionada < producto.stockCamion) {
-                                    onCambiarCantidad(cantidadSeleccionada + 1)
-                                }
-                            },
-                            enabled = cantidadSeleccionada < producto.stockCamion,
-                            colors = ButtonDefaults.buttonColors(containerColor = FoePrimary)
-                        ) {
-                            Text("+")
-                        }
-                    }
-                } else {
-                    Button(
-                        onClick = { onCambiarCantidad(1) },
-                        enabled = !agotado,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FoePrimaryContainer,
-                            contentColor = FoeOnPrimaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = if (agotado) "Sin existencia" else "+ Seleccionar producto",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -2021,7 +1177,8 @@ private fun VistaNuevoCliente(
     pideCredito: Boolean,
     onPideCreditoChange: (Boolean) -> Unit,
     fotoTomada: Boolean,
-    onTomarFoto: () -> Unit,
+    fotoUri: String?,
+    onFotoCapturada: (String) -> Unit,
     direccion: String,
     onDireccionChange: (String) -> Unit,
     gpsGuardado: Boolean,
@@ -2037,10 +1194,9 @@ private fun VistaNuevoCliente(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Indicador de progreso por pasos (nc-prog-wrap del demo FOE 360)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -2203,7 +1359,6 @@ private fun VistaNuevoCliente(
                         color = FoeOnSurfaceVariant
                     )
 
-                    // Bloque de Foto de la fachada
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
@@ -2233,14 +1388,11 @@ private fun VistaNuevoCliente(
                                 color = FoeOnSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
-                            Button(
-                                onClick = onTomarFoto,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (fotoTomada) ModuloVerde else FoePrimary
-                                )
-                            ) {
-                                Text(if (fotoTomada) "Repetir foto de fachada" else "Tomar foto de la fachada")
-                            }
+
+                            CamaraSection(
+                                fotoUri = fotoUri,
+                                onFotoCapturada = onFotoCapturada
+                            )
                         }
                     }
 
@@ -2252,7 +1404,6 @@ private fun VistaNuevoCliente(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Bloque de Ubicación GPS
                     if (gpsGuardado) {
                         Card(
                             shape = RoundedCornerShape(12.dp),
@@ -2339,18 +1490,9 @@ fun ClientesScreenPreview() {
         override suspend fun obtenerPorId(id: Int): ClienteEntity? =
             crearClientesPorDefecto().firstOrNull()
     }
-    val fakeProductoCLFK = object : ProductoCLFK {
-        override suspend fun insertar(producto: ProductoEntity) {}
-        override suspend fun insertarTodos(productos: List<ProductoEntity>) {}
-        override suspend fun obtenerTodos(): List<ProductoEntity> = crearProductosPorDefecto()
-        override suspend fun obtenerPorCategoria(categoria: String): List<ProductoEntity> =
-            crearProductosPorDefecto().filter { it.categoria == categoria }
-    }
     ProyectoFOETheme {
         ClientesScreen(
             clienteCLFK = fakeClienteCLFK,
-            productoCLFK = fakeProductoCLFK,
-            iniciarEnProductos = false,
             onVolverInicio = {}
         )
     }

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +18,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,7 +30,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.proyectofoe.local.ClienteCLFK
+import com.example.proyectofoe.local.ClienteEntity
+import com.example.proyectofoe.local.ProductoCLFK
+import com.example.proyectofoe.local.ProductoEntity
 import com.example.proyectofoe.local.UsuarioEntity
+import com.example.proyectofoe.ui.screens.CLIENTES_S.crearClientesPorDefecto
+import com.example.proyectofoe.ui.screens.CLIENTES_S.crearProductosPorDefecto
 import com.example.proyectofoe.ui.screens.LOGIN_S.crearUsuarioPorDefecto
 import com.example.proyectofoe.ui.theme.FoeCardBackground
 import com.example.proyectofoe.ui.theme.FoeOnPrimaryContainer
@@ -43,11 +52,42 @@ import com.example.proyectofoe.ui.theme.ProyectoFOETheme
 @Composable
 fun HomeScreen(
     usuario: UsuarioEntity,
+    clienteCLFK: ClienteCLFK,
+    productoCLFK: ProductoCLFK,
     onAbrirClientes: () -> Unit,
-    onAbrirProductosDesdeClientes: () -> Unit,
+    onAbrirProductos: () -> Unit,
     onCerrarSesion: () -> Unit
 ) {
-    val primerNombre = usuario.nombre.split(" ").firstOrNull() ?: usuario.nombre
+    val nombreUsuarioSaludo = usuario.usuario.ifBlank { usuario.nombre }
+
+    var totalClientes by remember {
+        mutableStateOf(12)
+    }
+
+    var totalProductos by remember {
+        mutableStateOf(14)
+    }
+
+    LaunchedEffect(clienteCLFK, productoCLFK) {
+        try {
+            var clientesDb = clienteCLFK.obtenerTodosOrdenadosPorNombre()
+            if (clientesDb.isEmpty()) {
+                clienteCLFK.insertarTodos(crearClientesPorDefecto())
+                clientesDb = clienteCLFK.obtenerTodosOrdenadosPorNombre()
+            }
+            totalClientes = clientesDb.size
+
+            var productosDb = productoCLFK.obtenerTodos()
+            if (productosDb.isEmpty()) {
+                productoCLFK.insertarTodos(crearProductosPorDefecto())
+                productosDb = productoCLFK.obtenerTodos()
+            }
+            totalProductos = productosDb.size
+        } catch (e: Exception) {
+            totalClientes = crearClientesPorDefecto().size
+            totalProductos = crearProductosPorDefecto().size
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -61,7 +101,7 @@ fun HomeScreen(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ENCABEZADO DE INICIO (hero del demo FOE 360)
+            // ENCABEZADO DE INICIO
             Card(
                 shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
                 colors = CardDefaults.cardColors(
@@ -75,7 +115,6 @@ fun HomeScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Barra superior con marca, iniciales y botón de cerrar sesión
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -115,7 +154,7 @@ fun HomeScreen(
                     }
 
                     Text(
-                        text = "Hola, $primerNombre",
+                        text = "Hola, $nombreUsuarioSaludo",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = FoeOnSurface
@@ -127,7 +166,6 @@ fun HomeScreen(
                         color = FoeOnSurfaceVariant
                     )
 
-                    // Chip de rol y vehículo
                     Card(
                         shape = RoundedCornerShape(50.dp),
                         colors = CardDefaults.cardColors(
@@ -145,7 +183,7 @@ fun HomeScreen(
                 }
             }
 
-            // MENÚ DE MÓDULOS DISPONIBLES (Únicamente Clientes y Productos)
+            // MENÚ DE MÓDULOS POR SEPARADO (Clientes y Productos)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -165,55 +203,20 @@ fun HomeScreen(
                 ) {
                     TarjetaModulo(
                         titulo = "Clientes",
-                        subtitulo = "Cartera y saldos",
-                        insignia = "12",
+                        subtitulo = "Cartera y registro",
+                        insignia = "$totalClientes",
                         colorFondo = ModuloVerde,
                         onClick = onAbrirClientes,
                         modifier = Modifier.weight(1f)
                     )
                     TarjetaModulo(
                         titulo = "Productos",
-                        subtitulo = "Desde clientes",
-                        insignia = "14",
+                        subtitulo = "Catálogo y registro",
+                        insignia = "$totalProductos",
                         colorFondo = ModuloAcero,
-                        onClick = onAbrirProductosDesdeClientes,
+                        onClick = onAbrirProductos,
                         modifier = Modifier.weight(1f)
                     )
-                }
-
-                // Tarjeta de acceso rápido al apartado de Clientes y visualización de Productos
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = FoeCardBackground
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Apartado de Clientes y Productos",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = FoeOnSurface
-                        )
-                        Text(
-                            text = "Ingresa a Clientes para consultar la cartera de la ruta, registrar nuevos clientes y visualizar los productos asignados a cada cliente.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = FoeOnSurfaceVariant
-                        )
-                        Button(
-                            onClick = onAbrirClientes,
-                            colors = ButtonDefaults.buttonColors(containerColor = ModuloVerde),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Entrar al módulo de Clientes")
-                        }
-                    }
                 }
             }
         }
@@ -293,11 +296,31 @@ private fun TarjetaModulo(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun HomeScreenPreview() {
+    val fakeClienteCLFK = object : ClienteCLFK {
+        override suspend fun insertar(cliente: ClienteEntity) {}
+        override suspend fun insertarTodos(clientes: List<ClienteEntity>) {}
+        override suspend fun actualizar(cliente: ClienteEntity) {}
+        override suspend fun obtenerTodosOrdenadosPorNombre(): List<ClienteEntity> =
+            crearClientesPorDefecto()
+        override suspend fun obtenerTodosPorParada(): List<ClienteEntity> =
+            crearClientesPorDefecto()
+        override suspend fun obtenerPorId(id: Int): ClienteEntity? =
+            crearClientesPorDefecto().firstOrNull()
+    }
+    val fakeProductoCLFK = object : ProductoCLFK {
+        override suspend fun insertar(producto: ProductoEntity) {}
+        override suspend fun insertarTodos(productos: List<ProductoEntity>) {}
+        override suspend fun obtenerTodos(): List<ProductoEntity> = crearProductosPorDefecto()
+        override suspend fun obtenerPorCategoria(categoria: String): List<ProductoEntity> =
+            crearProductosPorDefecto()
+    }
     ProyectoFOETheme {
         HomeScreen(
             usuario = crearUsuarioPorDefecto(),
+            clienteCLFK = fakeClienteCLFK,
+            productoCLFK = fakeProductoCLFK,
             onAbrirClientes = {},
-            onAbrirProductosDesdeClientes = {},
+            onAbrirProductos = {},
             onCerrarSesion = {}
         )
     }

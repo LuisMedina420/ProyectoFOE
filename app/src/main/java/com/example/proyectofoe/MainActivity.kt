@@ -18,6 +18,7 @@ import com.example.proyectofoe.local.UsuarioEntity
 import com.example.proyectofoe.ui.screens.CLIENTES_S.ClientesScreen
 import com.example.proyectofoe.ui.screens.HOME_S.HomeScreen
 import com.example.proyectofoe.ui.screens.LOGIN_S.LoginScreen
+import com.example.proyectofoe.ui.screens.PRODUCTOS_S.ProductosScreen
 import com.example.proyectofoe.ui.theme.ProyectoFOETheme
 
 class MainActivity : ComponentActivity() {
@@ -53,7 +54,7 @@ fun PantallaPrincipal(
         mutableStateOf(false)
     }
 
-    var mostrarProductosDesdeClientes by remember {
+    var mostrarProductos by remember {
         mutableStateOf(false)
     }
 
@@ -65,7 +66,7 @@ fun PantallaPrincipal(
                     onLoginExitoso = { usuario ->
                         usuarioAutenticado = usuario
                         mostrarClientes = false
-                        mostrarProductosDesdeClientes = false
+                        mostrarProductos = false
                     }
                 )
             }
@@ -73,21 +74,17 @@ fun PantallaPrincipal(
             mostrarClientes -> {
                 ClientesScreen(
                     clienteCLFK = db.clienteCLFK(),
-                    productoCLFK = db.productoCLFK(),
-                    iniciarEnProductos = false,
                     onVolverInicio = {
                         mostrarClientes = false
                     }
                 )
             }
 
-            mostrarProductosDesdeClientes -> {
-                ClientesScreen(
-                    clienteCLFK = db.clienteCLFK(),
+            mostrarProductos -> {
+                ProductosScreen(
                     productoCLFK = db.productoCLFK(),
-                    iniciarEnProductos = true,
                     onVolverInicio = {
-                        mostrarProductosDesdeClientes = false
+                        mostrarProductos = false
                     }
                 )
             }
@@ -95,16 +92,20 @@ fun PantallaPrincipal(
             else -> {
                 HomeScreen(
                     usuario = usuarioAutenticado!!,
+                    clienteCLFK = db.clienteCLFK(),
+                    productoCLFK = db.productoCLFK(),
                     onAbrirClientes = {
                         mostrarClientes = true
+                        mostrarProductos = false
                     },
-                    onAbrirProductosDesdeClientes = {
-                        mostrarProductosDesdeClientes = true
+                    onAbrirProductos = {
+                        mostrarProductos = true
+                        mostrarClientes = false
                     },
                     onCerrarSesion = {
                         usuarioAutenticado = null
                         mostrarClientes = false
-                        mostrarProductosDesdeClientes = false
+                        mostrarProductos = false
                     }
                 )
             }

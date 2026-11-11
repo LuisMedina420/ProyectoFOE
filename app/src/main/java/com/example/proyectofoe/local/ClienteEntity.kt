@@ -21,5 +21,6 @@ data class ClienteEntity(
     val pideCredito: Boolean,
     val tieneFotoFachada: Boolean,
     val tieneUbicacionGps: Boolean,
-    val sugeridos: String      // Ej. "1:2,7:2,5:1,2:1" (idProducto:cantidad)
+    val sugeridos: String,     // Ej. "1:2,7:2,5:1,2:1" (idProducto:cantidad)
+    val fotoUri: String? = null
 )
