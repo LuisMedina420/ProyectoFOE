@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface ProductoCLFK {
@@ -12,6 +13,9 @@ interface ProductoCLFK {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarTodos(productos: List<ProductoEntity>)
+
+    @Update
+    suspend fun actualizar(producto: ProductoEntity)
 
     @Query("SELECT * FROM productos ORDER BY id ASC")
     suspend fun obtenerTodos(): List<ProductoEntity>

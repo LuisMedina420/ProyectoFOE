@@ -72,6 +72,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProductosScreen(
     productoCLFK: ProductoCLFK,
+    carritoItems: List<ItemCarrito>,
+    onAgregarAlCarrito: (ProductoEntity, Int) -> Unit,
+    onAbrirCarrito: () -> Unit,
     onVolverInicio: () -> Unit
 ) {
     var listaProductos by remember { mutableStateOf(emptyList<ProductoEntity>()) }
@@ -191,25 +194,41 @@ fun ProductosScreen(
                     }
 
                     if (subvista == "lista") {
-                        Button(
-                            onClick = {
-                                nuevoProdNombre = ""
-                                nuevoProdPresentacion = ""
-                                nuevoProdCategoria = "granos"
-                                nuevoProdTipoEmpaque = "Bolsa"
-                                nuevoProdPrecioLempiras = ""
-                                nuevoProdIsvPorcentaje = 15
-                                nuevoProdStockCamion = "10"
-                                nuevoProdStockDeposito = "100"
-                                mensajeAviso = ""
-                                subvista = "nuevo"
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ModuloVerde,
-                                contentColor = Color.White
-                            )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("+ Nuevo")
+                            val totalUnidadesCarrito = carritoItems.sumOf { it.cantidad }
+                            Button(
+                                onClick = onAbrirCarrito,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ModuloAmbar,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Carrito ($totalUnidadesCarrito)")
+                            }
+
+                            Button(
+                                onClick = {
+                                    nuevoProdNombre = ""
+                                    nuevoProdPresentacion = ""
+                                    nuevoProdCategoria = "granos"
+                                    nuevoProdTipoEmpaque = "Bolsa"
+                                    nuevoProdPrecioLempiras = ""
+                                    nuevoProdIsvPorcentaje = 15
+                                    nuevoProdStockCamion = "10"
+                                    nuevoProdStockDeposito = "100"
+                                    mensajeAviso = ""
+                                    subvista = "nuevo"
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ModuloVerde,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("+ Nuevo")
+                            }
                         }
                     }
                 }
@@ -252,6 +271,7 @@ fun ProductosScreen(
                 "lista" -> {
                     VistaCatalogoProductos(
                         productos = listaProductos,
+                        carritoItems = carritoItems,
                         busqueda = busquedaProducto,
                         onBusquedaChange = { busquedaProducto = it },
                         categoriaSeleccionada = categoriaProducto,
@@ -260,6 +280,13 @@ fun ProductosScreen(
                             productoSeleccionado = prod
                             subvista = "detalle"
                         },
+                        onAgregarAlCarrito = { prod, cantidad ->
+                            val cantidadPrevia = carritoItems.firstOrNull { it.producto.id == prod.id }?.cantidad ?: 0
+                            onAgregarAlCarrito(prod, cantidad)
+                            mensajeAviso =
+                                "Agregado: $cantidad x ${prod.nombre} (En carrito: ${cantidadPrevia + cantidad})."
+                        },
+                        onAbrirCarrito = onAbrirCarrito,
                         onNuevoProducto = {
                             nuevoProdNombre = ""
                             nuevoProdPresentacion = ""
@@ -277,8 +304,16 @@ fun ProductosScreen(
 
                 "detalle" -> {
                     if (productoActivo != null) {
+                        val enCarrito = carritoItems.firstOrNull { it.producto.id == productoActivo.id }?.cantidad ?: 0
                         VistaDetalleProducto(
                             producto = productoActivo,
+                            cantidadEnCarrito = enCarrito,
+                            onAgregarAlCarrito = { cantidad ->
+                                onAgregarAlCarrito(productoActivo, cantidad)
+                                mensajeAviso =
+                                    "Agregado: $cantidad x ${productoActivo.nombre} (En carrito: ${enCarrito + cantidad})."
+                            },
+                            onAbrirCarrito = onAbrirCarrito,
                             onVolverLista = { subvista = "lista" }
                         )
                     }
@@ -344,11 +379,14 @@ fun ProductosScreen(
 @Composable
 private fun VistaCatalogoProductos(
     productos: List<ProductoEntity>,
+    carritoItems: List<ItemCarrito>,
     busqueda: String,
     onBusquedaChange: (String) -> Unit,
     categoriaSeleccionada: String,
     onCategoriaChange: (String) -> Unit,
     onAbrirDetalleProducto: (ProductoEntity) -> Unit,
+    onAgregarAlCarrito: (ProductoEntity, Int) -> Unit,
+    onAbrirCarrito: () -> Unit,
     onNuevoProducto: () -> Unit
 ) {
     val consulta = busqueda.trim().lowercase()
@@ -472,9 +510,34 @@ private fun VistaCatalogoProductos(
                 }
             }
         } else {
+            val totalUnidadesCarrito = carritoItems.sumOf { it.cantidad }
+            if (totalUnidadesCarrito > 0) {
+                Button(
+                    onClick = onAbrirCarrito,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ModuloAmbar,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Ver carrito de compra ($totalUnidadesCarrito uds.) · Total: ${
+                            formatearLempiras(calcularTotalCarritoCentavos(carritoItems))
+                        }",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             productosFiltrados.forEach { prod ->
+                val cantidadEnCarrito = carritoItems.firstOrNull { it.producto.id == prod.id }?.cantidad ?: 0
                 TarjetaProductoCatalogo(
                     producto = prod,
+                    cantidadEnCarrito = cantidadEnCarrito,
+                    onAgregarAlCarrito = { cantidad ->
+                        onAgregarAlCarrito(prod, cantidad)
+                    },
                     onAbrirDetalle = { onAbrirDetalleProducto(prod) }
                 )
             }
@@ -485,8 +548,11 @@ private fun VistaCatalogoProductos(
 @Composable
 private fun TarjetaProductoCatalogo(
     producto: ProductoEntity,
+    cantidadEnCarrito: Int,
+    onAgregarAlCarrito: (Int) -> Unit,
     onAbrirDetalle: () -> Unit
 ) {
+    var cantidadSeleccionada by remember(producto.id) { mutableStateOf(1) }
     val colorCategoria = when (producto.categoria) {
         "granos" -> ModuloAmbar
         "aceites" -> ModuloCoral
@@ -622,6 +688,73 @@ private fun TarjetaProductoCatalogo(
                     Text("Ver ficha", fontSize = 12.sp)
                 }
             }
+
+            if (cantidadEnCarrito > 0) {
+                Text(
+                    text = "En carrito: $cantidadEnCarrito unidades",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ModuloVerde
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (cantidadSeleccionada > 1) {
+                                cantidadSeleccionada -= 1
+                            }
+                        },
+                        enabled = !agotado && cantidadSeleccionada > 1
+                    ) {
+                        Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Text(
+                        text = "$cantidadSeleccionada",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = FoeOnSurface,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            if (cantidadSeleccionada < producto.stockCamion) {
+                                cantidadSeleccionada += 1
+                            }
+                        },
+                        enabled = !agotado && cantidadSeleccionada < producto.stockCamion
+                    ) {
+                        Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        onAgregarAlCarrito(cantidadSeleccionada)
+                        cantidadSeleccionada = 1
+                    },
+                    enabled = !agotado,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ModuloVerde,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = if (agotado) "Agotado" else "Agregar",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }
@@ -629,8 +762,13 @@ private fun TarjetaProductoCatalogo(
 @Composable
 private fun VistaDetalleProducto(
     producto: ProductoEntity,
+    cantidadEnCarrito: Int,
+    onAgregarAlCarrito: (Int) -> Unit,
+    onAbrirCarrito: () -> Unit,
     onVolverLista: () -> Unit
 ) {
+    var cantidadSeleccionada by remember(producto.id) { mutableStateOf(1) }
+    val agotado = producto.stockCamion <= 0
     val colorCategoria = when (producto.categoria) {
         "granos" -> ModuloAmbar
         "aceites" -> ModuloCoral
@@ -825,6 +963,106 @@ private fun VistaDetalleProducto(
                         fontWeight = FontWeight.Bold,
                         color = FoeOnSurface
                     )
+                }
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = FoeCardBackground),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "AGREGAR AL CARRITO",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = FoeOnSurfaceVariant
+                )
+
+                if (cantidadEnCarrito > 0) {
+                    Text(
+                        text = "Actualmente tienes $cantidadEnCarrito unidades en el carrito.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = ModuloVerde
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (cantidadSeleccionada > 1) {
+                                    cantidadSeleccionada -= 1
+                                }
+                            },
+                            enabled = !agotado && cantidadSeleccionada > 1
+                        ) {
+                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Text(
+                            text = "$cantidadSeleccionada",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = FoeOnSurface,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+
+                        OutlinedButton(
+                            onClick = {
+                                if (cantidadSeleccionada < producto.stockCamion) {
+                                    cantidadSeleccionada += 1
+                                }
+                            },
+                            enabled = !agotado && cantidadSeleccionada < producto.stockCamion
+                        ) {
+                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            onAgregarAlCarrito(cantidadSeleccionada)
+                            cantidadSeleccionada = 1
+                        },
+                        enabled = !agotado,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ModuloVerde,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = if (agotado) "Agotado" else "Agregar al carrito",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (cantidadEnCarrito > 0) {
+                    Button(
+                        onClick = onAbrirCarrito,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ModuloAmbar,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Ir al carrito de compra", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -1172,6 +1410,7 @@ fun ProductosScreenPreview() {
     val fakeProductoCLFK = object : ProductoCLFK {
         override suspend fun insertar(producto: ProductoEntity) {}
         override suspend fun insertarTodos(productos: List<ProductoEntity>) {}
+        override suspend fun actualizar(producto: ProductoEntity) {}
         override suspend fun obtenerTodos(): List<ProductoEntity> = crearProductosPorDefecto()
         override suspend fun obtenerPorCategoria(categoria: String): List<ProductoEntity> =
             crearProductosPorDefecto().filter { it.categoria == categoria }
@@ -1179,6 +1418,9 @@ fun ProductosScreenPreview() {
     ProyectoFOETheme {
         ProductosScreen(
             productoCLFK = fakeProductoCLFK,
+            carritoItems = emptyList(),
+            onAgregarAlCarrito = { _, _ -> },
+            onAbrirCarrito = {},
             onVolverInicio = {}
         )
     }

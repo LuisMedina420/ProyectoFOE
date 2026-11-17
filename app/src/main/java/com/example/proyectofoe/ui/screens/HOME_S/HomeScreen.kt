@@ -46,6 +46,7 @@ import com.example.proyectofoe.ui.theme.FoePrimaryContainer
 import com.example.proyectofoe.ui.theme.FoeSurface
 import com.example.proyectofoe.ui.theme.FoeSurfaceContainerLow
 import com.example.proyectofoe.ui.theme.ModuloAcero
+import com.example.proyectofoe.ui.theme.ModuloAmbar
 import com.example.proyectofoe.ui.theme.ModuloVerde
 import com.example.proyectofoe.ui.theme.ProyectoFOETheme
 
@@ -54,8 +55,10 @@ fun HomeScreen(
     usuario: UsuarioEntity,
     clienteCLFK: ClienteCLFK,
     productoCLFK: ProductoCLFK,
+    totalCarrito: Int,
     onAbrirClientes: () -> Unit,
     onAbrirProductos: () -> Unit,
+    onAbrirCarrito: () -> Unit,
     onCerrarSesion: () -> Unit
 ) {
     val nombreUsuarioSaludo = usuario.usuario.ifBlank { usuario.nombre }
@@ -218,6 +221,15 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                TarjetaModulo(
+                    titulo = "Carrito de compra",
+                    subtitulo = "Productos agregados y venta",
+                    insignia = "$totalCarrito",
+                    colorFondo = ModuloAmbar,
+                    onClick = onAbrirCarrito,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -310,6 +322,7 @@ fun HomeScreenPreview() {
     val fakeProductoCLFK = object : ProductoCLFK {
         override suspend fun insertar(producto: ProductoEntity) {}
         override suspend fun insertarTodos(productos: List<ProductoEntity>) {}
+        override suspend fun actualizar(producto: ProductoEntity) {}
         override suspend fun obtenerTodos(): List<ProductoEntity> = crearProductosPorDefecto()
         override suspend fun obtenerPorCategoria(categoria: String): List<ProductoEntity> =
             crearProductosPorDefecto()
@@ -319,8 +332,10 @@ fun HomeScreenPreview() {
             usuario = crearUsuarioPorDefecto(),
             clienteCLFK = fakeClienteCLFK,
             productoCLFK = fakeProductoCLFK,
+            totalCarrito = 5,
             onAbrirClientes = {},
             onAbrirProductos = {},
+            onAbrirCarrito = {},
             onCerrarSesion = {}
         )
     }
